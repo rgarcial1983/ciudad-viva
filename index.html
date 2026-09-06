@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ciudad Viva · Agenda urbana y cultural</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Ciudad Viva</h1>
+      <p>Agenda cultural y planes de ocio en Úbeda</p>
+    </div>
+    <nav class="tabs">
+      <button class="tab" data-view="admin">Administración</button>
+      <button class="tab on" data-view="citizen">Vista ciudadana</button>
+    </nav>
+  </header>
+
+  <!-- Vista Ciudadana -->
+  <section id="citizen" class="view on">
+    <div class="catalog-header">
+      <h2>¿Qué hacer en Úbeda?</h2>
+      <p>Descubre eventos, rutas, conciertos y actividades programadas para los próximos 30 días.</p>
+
+      <div class="filter-bar">
+        <div class="filter-row-top">
+          <div class="search-wrap">
+            <input id="search" placeholder="Buscar por título, temática o artista...">
+          </div>
+          <select id="town" class="filter-select">
+            <option value="">Todos los municipios</option>
+          </select>
+          <select id="date" class="filter-select">
+            <option value="">Próximos 30 días</option>
+            <option>Hoy</option>
+            <option>Mañana</option>
+            <option>Domingo</option>
+          </select>
+        </div>
+        
+        <!-- Chips deslizables -->
+        <div class="chips-row">
+          <button class="chip-item on" data-cat="">Todas</button>
+          <button class="chip-item" data-cat="Música">🎵 Música</button>
+          <button class="chip-item" data-cat="Patrimonio">🏛️ Patrimonio</button>
+          <button class="chip-item" data-cat="Gastronomía">🍴 Gastronomía</button>
+          <button class="chip-item" data-cat="Talleres">🎨 Talleres</button>
+          <button class="chip-item" data-cat="Cine">🎬 Cine</button>
+          <button class="chip-item" data-cat="Deporte">🏃 Deporte</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h3>Agenda disponible</h3>
+      <span id="count" class="muted"></span>
+    </div>
+    
+    <div id="cards" class="cards"></div>
+    <div id="scroll-sentinel" style="text-align:center; padding:32px 16px; color:#64748b; font-weight:600; font-size:14px;">
+      <span id="sentinel-text">Cargando más eventos...</span>
+    </div>
+  </section>
+
+  <!-- Vista Administración -->
+  <section id="admin" class="view">
+    <div class="admin">
+      <aside class="side">
+        <button class="admin-tab on" data-admin-subview="summary">Resumen</button>
+        <button class="admin-tab" data-admin-subview="towns">Municipios</button>
+        <button class="admin-tab" data-admin-subview="categories">Categorías</button>
+        <button class="admin-tab" data-admin-subview="venues">Lugares</button>
+        <button class="admin-tab" data-admin-subview="events">Eventos</button>
+      </aside>
+      
+      <!-- Subvista: Resumen -->
+      <div id="admin-subview-summary" class="admin-subview on" style="flex: 1;">
+        <div class="dashboard-head">
+          <div>
+            <h2 style="margin:0; font-size:22px;">Resumen del Sistema</h2>
+            <p class="muted">Vista general de actividad, municipios y estadísticas de la plataforma.</p>
+          </div>
+          <button id="btn-seed-data" class="btn-secondary" style="font-size:13px;">⚡ Cargar 30 Eventos y 20 Lugares de prueba</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="summary-towns-count">0</b><span class="muted">Municipios</span></div>
+          <div class="stat"><b id="summary-cats-count">0</b><span class="muted">Categorías</span></div>
+          <div class="stat"><b id="summary-venues-count">0</b><span class="muted">Lugares activos</span></div>
+          <div class="stat"><b id="summary-events-count">0</b><span class="muted">Eventos activos</span></div>
+        </div>
+        <div class="admin-grid">
+          <div class="panel">
+            <h3>Últimos eventos publicados</h3>
+            <div id="summary-recent-events" style="display:flex; flex-direction:column; gap:10px;">
+              <p class="muted">Cargando datos...</p>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Últimos lugares añadidos</h3>
+            <div id="summary-recent-venues" style="display:flex; flex-direction:column; gap:10px;">
+              <p class="muted">Cargando datos...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subvista: Municipios -->
+      <div id="admin-subview-towns" class="admin-subview" style="flex: 1; display: none;">
+        <div class="dashboard-head">
+          <div>
+            <h2 style="margin:0; font-size:22px;">Gestión de Municipios</h2>
+            <p class="muted">Añade o modifica los municipios participantes en la plataforma.</p>
+          </div>
+        </div>
+        
+        <div class="admin-grid">
+          <div class="panel">
+            <h3 id="town-form-title">Añadir Nuevo Municipio</h3>
+            <input type="hidden" id="town-edit-id" value="">
+            <div class="form">
+              <div class="field-group">
+                <label for="new-town-name">Nombre del municipio</label>
+                <input id="new-town-name" placeholder="Ej. Úbeda, Baeza, Linares...">
+              </div>
+              <div class="field-group">
+                <label for="new-town-province">Provincia / Región</label>
+                <input id="new-town-province" placeholder="Ej. Jaén" value="Jaén">
+              </div>
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <button class="primary" id="save-town">Guardar municipio</button>
+                <button class="btn-secondary" id="cancel-town-edit" style="display:none;">Cancelar</button>
+              </div>
+              <span class="toast" id="toast-town" style="display:none; color: green; font-size: 13px;">✔ Guardado con éxito.</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 style="margin:0;">Municipios registrados</h3>
+            </div>
+            <input id="admin-search-towns" placeholder="🔍 Buscar municipio..." style="width:100%; margin-bottom:14px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+            <div id="towns-list" style="display:flex; flex-direction:column; gap:12px;">
+              <p class="muted">Cargando municipios...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subvista: Categorías -->
+      <div id="admin-subview-categories" class="admin-subview" style="flex: 1; display: none;">
+        <div class="dashboard-head">
+          <div>
+            <h2 style="margin:0; font-size:22px;">Gestión de Categorías</h2>
+            <p class="muted">Clasificación temática de actividades culturales y de ocio.</p>
+          </div>
+        </div>
+        <div class="admin-grid">
+          <div class="panel">
+            <h3>Añadir Categoría</h3>
+            <div class="form">
+              <div class="field-group">
+                <label for="new-cat-name">Nombre de la categoría</label>
+                <input id="new-cat-name" placeholder="Ej. Teatro, Exposición, Infantil...">
+              </div>
+              <div class="field-group">
+                <label for="new-cat-icon">Emoji / Icono</label>
+                <input id="new-cat-icon" placeholder="Ej. 🎭, 🎨, 🎪">
+              </div>
+              <button class="primary" id="save-cat">Añadir categoría</button>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Categorías activas</h3>
+            <div id="categories-list" style="display:flex; flex-direction:column; gap:10px;">
+              <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">🎵 Música</div>
+              <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">🏛️ Patrimonio</div>
+              <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">🍴 Gastronomía</div>
+              <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">🎨 Talleres</div>
+              <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">🎬 Cine</div>
+              <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">🏃 Deporte</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subvista: Lugares -->
+      <div id="admin-subview-venues" class="admin-subview" style="flex: 1; display: none;">
+        <div class="dashboard-head">
+          <div>
+            <h2 style="margin:0; font-size:22px;">Gestión de Lugares</h2>
+            <p class="muted">Crea, edita o elimina espacios y sus enlaces a Google Maps.</p>
+          </div>
+        </div>
+        
+        <div class="admin-grid">
+          <div class="panel">
+            <h3 id="venue-form-title">Añadir Nuevo Lugar</h3>
+            <input type="hidden" id="venue-edit-id" value="">
+            <div class="form">
+              <div class="field-group">
+                <label for="new-venue-town">Municipio</label>
+                <select id="new-venue-town">
+                  <option value="">Cargando municipios...</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label for="new-venue-name">Nombre del espacio</label>
+                <input id="new-venue-name" placeholder="Ej. Hospital de Santiago">
+              </div>
+              <div class="field-group">
+                <label for="new-venue-maps">Enlace de Google Maps</label>
+                <input id="new-venue-maps" placeholder="https://maps.app.goo.gl/...">
+              </div>
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <button class="primary" id="save-venue">Guardar lugar</button>
+                <button class="btn-secondary" id="cancel-venue-edit" style="display:none;">Cancelar</button>
+              </div>
+              <span class="toast" id="toast-venue" style="display:none; color: green; font-size: 13px;">✔ Guardado con éxito.</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 style="margin:0;">Lugares registrados</h3>
+            </div>
+            <input id="admin-search-venues" placeholder="🔍 Buscar lugar por nombre..." style="width:100%; margin-bottom:14px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font-inherit;">
+            <div id="venues-list" class="venues-list" style="display:flex; flex-direction:column; gap:12px;">
+              <p class="muted">Cargando lugares...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subvista: Eventos -->
+      <div id="admin-subview-events" class="admin-subview" style="flex: 1; display: none;">
+        <div class="dashboard-head">
+          <div>
+            <h2 style="margin:0; font-size:22px;">Gestión de Eventos</h2>
+            <p class="muted">Publica, edita y modera actividades para la ciudadanía.</p>
+          </div>
+          <button class="primary" id="btn-new-event">+ Nuevo evento</button>
+        </div>
+        <div class="admin-grid">
+          <div class="panel" id="event-form-panel">
+            <h3 id="event-form-title">Publicación de Evento</h3>
+            <input type="hidden" id="event-edit-id" value="">
+            <div class="form">
+              <div class="field-group">
+                <label for="new-title">Título del evento</label>
+                <input id="new-title" placeholder="Ej. Concierto de Jazz en el Palacio">
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <div class="field-group">
+                  <label for="new-cat">Categoría</label>
+                  <select id="new-cat">
+                    <option>Música</option>
+                    <option>Gastronomía</option>
+                    <option>Talleres</option>
+                    <option>Cine</option>
+                    <option>Patrimonio</option>
+                    <option>Deporte</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label for="new-venue">Lugar de celebración</label>
+                  <input id="new-venue" list="locations-datalist" placeholder="Escribe o busca un lugar...">
+                  <datalist id="locations-datalist"></datalist>
+                </div>
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <div class="field-group">
+                  <label for="new-date">Fecha</label>
+                  <input type="date" id="new-date">
+                </div>
+                <div class="field-group">
+                  <label for="new-time">Hora de inicio</label>
+                  <input type="time" id="new-time" value="20:00">
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>Precio de la entrada</label>
+                <div style="display:flex; gap:14px; align-items:center;">
+                  <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" id="new-price-free" checked> Evento Gratuito
+                  </label>
+                  <div id="price-input-wrap" class="input-with-suffix" style="display:none; flex:1;">
+                    <input type="number" id="new-price-num" min="0" step="0.50" placeholder="0.00">
+                    <span class="input-suffix">€</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label for="new-desc">Descripción o detalles del evento</label>
+                <textarea id="new-desc" rows="3" placeholder="Información sobre accesos, artistas, programa..."></textarea>
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <div class="field-group">
+                  <label for="new-link-fb">Publicación en Facebook (opcional)</label>
+                  <input type="url" id="new-link-fb" placeholder="https://facebook.com/...">
+                </div>
+                <div class="field-group">
+                  <label for="new-link-web">Web Oficial / Entradas (opcional)</label>
+                  <input type="url" id="new-link-web" placeholder="https://...">
+                </div>
+              </div>
+              
+              <!-- Zona multi-foto -->
+              <div class="field-group">
+                <label>Carteles o Imágenes (máximo 3)</label>
+                <div id="drop-zone" class="drop-zone">
+                  <input type="file" id="poster-input" accept="image/*" multiple style="display:none">
+                  <div id="drop-content">
+                    <p style="margin:0; font-weight:600;">Haz clic o arrastra fotos aquí</p>
+                    <span class="muted" id="slots-info">3 huecos disponibles</span>
+                  </div>
+                </div>
+                <div id="thumbs-container" class="thumbs-grid" style="display:none"></div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <button class="primary" id="save">Publicar en la agenda</button>
+                <button class="btn-secondary" id="cancel-event-edit" style="display:none;">Cancelar</button>
+              </div>
+              <span class="toast" id="toast" style="display:none;">✔ Guardado con éxito.</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <h3 style="margin:0;">Eventos registrados</h3>
+            </div>
+            <input id="admin-search-events" placeholder="🔍 Buscar por título, categoría o lugar..." style="width:100%; margin-bottom:14px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+            <div id="admin-events-list" style="display:flex; flex-direction:column; gap:12px;">
+              <p class="muted">Cargando eventos...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<!-- Modal Detalle -->
+<div id="detail" class="detail">
+  <article class="modal">
+    <div class="modal-head-nav">
+      <button class="btn-back-link" onclick="closeDetail()">← Volver al listado</button>
+      <button class="close" onclick="closeDetail()">×</button>
+    </div>
+    
+    <div id="modal-gallery" class="modal-gallery" style="display:none"></div>
+    <span id="dtag" class="tag-category"></span>
+    <h2 id="dtitle"></h2>
+    <p id="ddesc" class="muted" style="font-size:15px;"></p>
+    
+    <div class="info">
+      <b style="display:block; margin-bottom:8px;">Datos prácticos</b>
+      <p style="margin:4px 0;"><b>Cuándo:</b> <span id="dwhen"></span></p>
+      <p style="margin:4px 0;"><b>Dónde:</b> <span id="dwhere"></span></p>
+      <p style="margin:4px 0;"><b>Entrada:</b> <span id="dprice"></span></p>
+      
+      <!-- Enlaces externos (Facebook / Web oficial) -->
+      <div id="modal-links" style="margin-top:12px; display:flex; flex-direction:column; gap:6px;"></div>
+
+      <div class="modal-actions">
+        <button class="primary">Añadir a mi calendario</button>
+        <button class="btn-secondary" onclick="closeDetail()">Volver</button>
+      </div>
+    </div>
+  </article>
+</div>
+
+<!-- Lightbox Cine Inmersivo -->
+<div id="lightbox" class="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">×</button>
+  <button class="lb-nav lb-prev" onclick="prevLightboxPhoto()">‹</button>
+  <img id="lb-img" class="lightbox-img" src="" alt="Ampliación">
+  <button class="lb-nav lb-next" onclick="nextLightboxPhoto()">›</button>
+  <div id="lb-counter" class="lb-counter">1 / 1</div>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
