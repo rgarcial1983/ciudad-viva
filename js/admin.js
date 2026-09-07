@@ -331,6 +331,15 @@ function renderTowns() {
     if (currentVal && availableTowns.some(t => t.name === currentVal)) venueTownSelect.value = currentVal;
   }
 
+  const eventTownSelect = $('#admin-filter-town-events');
+  if (eventTownSelect) {
+    const currentVal = eventTownSelect.value;
+    const availableTowns = towns.filter(t => isTownAllowed(t.name));
+    eventTownSelect.innerHTML = `<option value="">Todos los municipios autorizados</option>` +
+      availableTowns.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+    if (currentVal && availableTowns.some(t => t.name === currentVal)) eventTownSelect.value = currentVal;
+  }
+
   const listEl = $('#towns-list');
   if (!listEl) return;
 
@@ -614,26 +623,35 @@ async function loadEvents() {
   }
 }
 
+function getFilteredAdminEvents() {
+  const query = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
+  const townFilter = ($('#admin-filter-town-events') ? $('#admin-filter-town-events').value : '');
+
+  return events.filter(e => 
+    isTownAllowed(e.town) &&
+    (!townFilter || e.town === townFilter) &&
+    (e.title.toLowerCase().includes(query) ||
+     e.category.toLowerCase().includes(query) ||
+     (e.venue && e.venue.toLowerCase().includes(query)))
+  );
+}
+
 function renderAdminEvents() {
   const adminEventsList = $('#admin-events-list');
   if (!adminEventsList) return;
 
-  const adminSearchQuery = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
-  const adminFilteredEvents = events.filter(e => 
-    isTownAllowed(e.town) &&
-    (e.title.toLowerCase().includes(adminSearchQuery) ||
-     e.category.toLowerCase().includes(adminSearchQuery) ||
-     (e.venue && e.venue.toLowerCase().includes(adminSearchQuery)))
-  );
+  const adminFilteredEvents = getFilteredAdminEvents();
+  const query = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
+  const townFilter = ($('#admin-filter-town-events') ? $('#admin-filter-town-events').value : '');
 
   if (adminFilteredEvents.length === 0) {
-    adminEventsList.innerHTML = `<p class="muted">${adminSearchQuery ? 'No hay eventos que coincidan con la búsqueda.' : 'No hay eventos en tus municipios asignados.'}</p>`;
+    adminEventsList.innerHTML = `<p class="muted">${(query || townFilter) ? 'No hay eventos que coincidan con la búsqueda o filtro seleccionado.' : 'No hay eventos en tus municipios asignados.'}</p>`;
   } else {
     adminEventsList.innerHTML = adminFilteredEvents.map(e => `
       <div class="admin-list-item">
         <div>
           <b style="font-size:15px;">${e.title}</b><br>
-          <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${e.dateLabel || e.time})</span>
+          <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${e.dateLabel || e.time}) · <b>${e.town}</b></span>
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn-action-edit" onclick="editEvent('${e.id}')">✏️ Editar</button>
@@ -644,15 +662,36 @@ function renderAdminEvents() {
   }
 }
 
+if ($('#admin-search-events')) $('#admin-search-events').oninput = renderAdminEvents;
+if ($('#admin-filter-town-events')) $('#admin-filter-town-events').onchange = renderAdminEvents;
+
 if ($('#btn-export-pdf')) {
   $('#btn-export-pdf').onclick = () => exportAgendaPDF();
 }
 
 function exportAgendaPDF() {
-  const scopedEvents = events.filter(e => isTownAllowed(e.town));
-  if (scopedEvents.length === 0) {
-    return notifyWarning('No hay eventos disponibles para exportar.');
+  const filteredEvents = getFilteredAdminEvents();
+  if (filteredEvents.length === 0) {
+    return notifyWarning('No hay eventos en la lista filtrada actual para exportar.');
   }
+
+  const townFilterVal = $('#admin-filter-town-events') ? $('#admin-filter-town-events').value : '';
+  const searchVal = $('#admin-search-events') ? $('#admin-search-events').value.trim() : '';
+
+  let subtitleParts = [];
+  if (townFilterVal) {
+    subtitleParts.push(`Municipio: ${townFilterVal}`);
+  } else if (currentUserProfile && currentUserProfile.role !== 'superadmin') {
+    subtitleParts.push(`Municipios: ${(currentUserProfile.allowedTowns || []).join(', ')}`);
+  } else {
+    subtitleParts.push('Todos los municipios');
+  }
+
+  if (searchVal) {
+    subtitleParts.push(`Búsqueda: "${searchVal}"`);
+  }
+
+  const subtitleText = `Boletín Oficial de Agenda Cultural (${subtitleParts.join(' · ')})`;
 
   const container = document.createElement('div');
   container.style.padding = '24px';
@@ -666,11 +705,11 @@ function exportAgendaPDF() {
     <div style="border-bottom: 2px solid #2563eb; padding-bottom: 14px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
       <div>
         <h1 style="margin:0; font-size:24px; color:#2563eb; font-weight:800;">Ciudad Viva</h1>
-        <p style="margin:3px 0 0; color:#64748b; font-size:13px;">Boletín Oficial de Agenda Cultural y Planes de Ocio</p>
+        <p style="margin:3px 0 0; color:#64748b; font-size:13px;">${subtitleText}</p>
       </div>
       <div style="text-align:right; font-size:12px; color:#64748b;">
         <b>Emisión:</b> ${dateStr}<br>
-        <b>Actividades:</b> ${scopedEvents.length}
+        <b>Actividades exportadas:</b> ${filteredEvents.length}
       </div>
     </div>
 
@@ -687,7 +726,7 @@ function exportAgendaPDF() {
       <tbody>
   `;
 
-  scopedEvents.forEach(e => {
+  filteredEvents.forEach(e => {
     html += `
       <tr style="border-bottom: 1px solid #e2e8f0;">
         <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${e.dateLabel || 'Próximamente'}<br><span style="font-weight:normal; font-size:11px; color:#64748b;">${e.time || '20:00'}</span></td>
@@ -703,22 +742,24 @@ function exportAgendaPDF() {
       </tbody>
     </table>
     <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; color: #94a3b8; font-size: 10px;">
-      Ciudad Viva © Plataforma de Agenda Cultural Municipal · Documento generado automáticamente.
+      Ciudad Viva © Plataforma de Agenda Cultural Municipal · Documento generado para ${townFilterVal || 'municipios autorizados'}.
     </div>
   `;
 
   container.innerHTML = html;
 
+  const pdfName = townFilterVal ? `Agenda_Cultural_${townFilterVal.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf` : `Agenda_Cultural_CiudadViva_${new Date().toISOString().slice(0,10)}.pdf`;
+
   const opt = {
     margin: 8,
-    filename: `Agenda_Cultural_CiudadViva_${new Date().toISOString().slice(0,10)}.pdf`,
+    filename: pdfName,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
   if (typeof html2pdf !== 'undefined') {
-    notifySuccess('Generando documento PDF de la agenda...');
+    notifySuccess(`Exportando ${filteredEvents.length} eventos a PDF...`);
     html2pdf().set(opt).from(container).save();
   } else {
     notifyError('Error', 'La librería de exportación a PDF no se ha cargado correctamente.');

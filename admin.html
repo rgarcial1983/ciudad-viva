@@ -39,7 +39,7 @@
             <label for="login-password">Contraseña</label>
             <input type="password" id="login-password" required placeholder="••••••••">
           </div>
-          <button type="submit" class="primary" id="btn-login-submit" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 15px;">Iniciar sesión</button>
+          <button type="submit" class="btn-primary" id="btn-login-submit" style="margin-top: 10px; width: 100%; padding: 12px; font-size: 15px;">Iniciar sesión</button>
           
           <div style="display:flex; align-items:center; margin:16px 0; gap:10px;">
             <div style="flex:1; height:1px; background:#e2e8f0;"></div>
@@ -138,7 +138,7 @@
                   </div>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:12px;">
-                  <button class="primary" id="save-user-permissions">Guardar Permisos</button>
+                  <button class="btn-primary" id="save-user-permissions">Guardar Permisos</button>
                   <button class="btn-secondary" id="cancel-user-edit" style="display:none;">Cancelar</button>
                 </div>
                 <span class="toast" id="toast-user" style="display:none; color: green; font-size: 13px;">✔ Permisos actualizados con éxito.</span>
@@ -180,7 +180,7 @@
                   <input id="new-town-province" placeholder="Ej. Jaén" value="Jaén">
                 </div>
                 <div style="display:flex; gap:10px; margin-top:8px;">
-                  <button class="primary" id="save-town">Guardar municipio</button>
+                  <button class="btn-primary" id="save-town">Guardar municipio</button>
                   <button class="btn-secondary" id="cancel-town-edit" style="display:none;">Cancelar</button>
                 </div>
                 <span class="toast" id="toast-town" style="display:none; color: green; font-size: 13px;">✔ Guardado con éxito.</span>
@@ -219,7 +219,7 @@
                   <label for="new-cat-icon">Emoji / Icono</label>
                   <input id="new-cat-icon" placeholder="Ej. 🎭, 🎨, 🎪">
                 </div>
-                <button class="primary" id="save-cat">Añadir categoría</button>
+                <button class="btn-primary" id="save-cat">Añadir categoría</button>
               </div>
             </div>
             <div class="panel">
@@ -279,7 +279,7 @@
                   </div>
                 </div>
                 <div style="display:flex; gap:10px; margin-top:8px;">
-                  <button class="primary" id="save-venue">Guardar lugar</button>
+                  <button class="btn-primary" id="save-venue">Guardar lugar</button>
                   <button class="btn-secondary" id="cancel-venue-edit" style="display:none;">Cancelar</button>
                 </div>
                 <span class="toast" id="toast-venue" style="display:none; color: green; font-size: 13px;">✔ Guardado con éxito.</span>
@@ -307,7 +307,7 @@
             </div>
             <div>
               <button class="btn-secondary" id="btn-export-pdf" style="margin-right:8px;">📄 Exportar Agenda PDF</button>
-              <button class="primary" id="btn-new-event">+ Nuevo evento</button>
+              <button class="btn-primary" id="btn-new-event">+ Nuevo evento</button>
             </div>
           </div>
           <div class="admin-grid">
@@ -393,7 +393,7 @@
                 </div>
 
                 <div style="display:flex; gap:10px; margin-top:8px;">
-                  <button class="primary" id="save">Publicar en la agenda</button>
+                  <button class="btn-primary" id="save">Publicar en la agenda</button>
                   <button class="btn-secondary" id="cancel-event-edit" style="display:none;">Cancelar</button>
                 </div>
                 <span class="toast" id="toast" style="display:none;">✔ Guardado con éxito.</span>
@@ -404,7 +404,12 @@
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <h3 style="margin:0;">Eventos registrados</h3>
               </div>
-              <input id="admin-search-events" placeholder="🔍 Buscar por título, categoría o lugar..." style="width:100%; margin-bottom:14px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+              <div style="display:flex; gap:10px; margin-bottom:14px;">
+                <select id="admin-filter-town-events" style="flex:1; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+                  <option value="">Todos los municipios autorizados</option>
+                </select>
+                <input id="admin-search-events" placeholder="🔍 Buscar por título, categoría o lugar..." style="flex:2; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+              </div>
               <div id="admin-events-list" style="display:flex; flex-direction:column; gap:12px;">
                 <p class="muted">Cargando eventos...</p>
               </div>
@@ -463,7 +468,7 @@
 
       <!-- Botones de Acción -->
       <div class="modal-actions">
-        <button class="primary" id="btn-add-calendar">📅 Añadir a mi calendario</button>
+        <button class="btn-primary" id="btn-add-calendar">📅 Añadir a mi calendario</button>
         <button class="btn-secondary" id="btn-share-event">🔗 Compartir</button>
         <button class="btn-secondary" onclick="closeDetail()">Cerrar</button>
       </div>
