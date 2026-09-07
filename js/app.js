@@ -1,7 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { 
-  getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, serverTimestamp 
+  getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp 
 } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { 
+  getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 
 const firebaseConfig = {
   projectId: "ciudad-viva-1c19f",
@@ -15,14 +18,19 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+
 const eventsRef = collection(db, "events");
 const locationsRef = collection(db, "locations");
 const townsRef = collection(db, "towns");
+const usersRef = collection(db, "users");
 
 let selectedCategory = '';
 let events = [];
 let locations = [];
 let towns = [];
+let usersList = [];
+let currentUserProfile = null;
 let uploadedPhotos = [];
 let activeGalleryPhotos = [];
 let currentLightboxIdx = 0;
@@ -32,6 +40,170 @@ let visibleCount = 6;
 let observer = null;
 
 const $ = s => document.querySelector(s);
+
+function isTownAllowed(townName) {
+  if (!currentUserProfile) return true;
+  if (currentUserProfile.role === 'superadmin') return true;
+  if (!currentUserProfile.allowedTowns || currentUserProfile.allowedTowns.includes('*')) return true;
+  return currentUserProfile.allowedTowns.includes(townName);
+}
+
+// ----------------------------------------------------
+// AUTENTICACIÓN Y PERSISTENCIA DE SESIÓN
+// ----------------------------------------------------
+onAuthStateChanged(auth, async (user) => {
+  const loginPanel = $('#admin-login-panel');
+  const adminContent = $('#admin-content-wrap');
+  const emailDisplay = $('#user-email-display');
+
+  if (user) {
+    if (loginPanel) loginPanel.style.display = 'none';
+    if (adminContent) adminContent.style.display = 'block';
+
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userDocRef);
+
+      if (!userSnap.exists()) {
+        const allUsersSnap = await getDocs(usersRef);
+        const isFirstUser = allUsersSnap.empty;
+        const isSuperadminEmail = (user.email && user.email.toLowerCase() === 'rgarcial1983@gmail.com');
+
+        const role = (isFirstUser || isSuperadminEmail) ? 'superadmin' : 'editor';
+        const allowedTowns = (role === 'superadmin') ? ['*'] : (towns.length ? [towns[0].name] : ['Úbeda']);
+
+        const newProfile = {
+          uid: user.uid,
+          email: user.email || 'Sin correo',
+          role: role,
+          allowedTowns: allowedTowns,
+          createdAt: serverTimestamp()
+        };
+
+        await setDoc(userDocRef, newProfile);
+        currentUserProfile = { ...newProfile };
+      } else {
+        currentUserProfile = userSnap.data();
+      }
+    } catch (err) {
+      console.error("Error al obtener perfil de usuario:", err);
+      currentUserProfile = { uid: user.uid, email: user.email, role: 'editor', allowedTowns: ['Úbeda'] };
+    }
+
+    if (emailDisplay) {
+      const roleLabel = currentUserProfile.role === 'superadmin' ? ' (Superadmin)' : ` (Gestor: ${(currentUserProfile.allowedTowns || []).join(', ')})`;
+      emailDisplay.textContent = (user.email || user.displayName || 'Usuario') + roleLabel;
+    }
+
+    updateUserRoleUI();
+  } else {
+    currentUserProfile = null;
+    if (adminContent) adminContent.style.display = 'none';
+    if (loginPanel) loginPanel.style.display = 'block';
+  }
+});
+
+function updateUserRoleUI() {
+  const isSuper = currentUserProfile && currentUserProfile.role === 'superadmin';
+
+  const usersTab = $('#tab-admin-users');
+  const townsTab = $('#tab-admin-towns');
+
+  if (usersTab) usersTab.style.display = isSuper ? 'block' : 'none';
+  if (townsTab) townsTab.style.display = isSuper ? 'block' : 'none';
+
+  if (isSuper) {
+    loadUsers();
+  } else {
+    const currentActiveSub = document.querySelector('.admin-subview.on');
+    if (currentActiveSub && (currentActiveSub.id === 'admin-subview-users' || currentActiveSub.id === 'admin-subview-towns')) {
+      document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('on'));
+      document.querySelectorAll('.admin-subview').forEach(sv => sv.style.display = 'none');
+      const summaryTab = document.querySelector('[data-admin-subview="summary"]');
+      if (summaryTab) summaryTab.classList.add('on');
+      const summarySub = $('#admin-subview-summary');
+      if (summarySub) summarySub.style.display = 'block';
+    }
+  }
+
+  renderTowns();
+  renderLocations();
+  draw();
+  updateSummaryStats();
+}
+
+// Formulario de Login tradicional (Email / Password)
+const loginForm = $('#login-form');
+if (loginForm) {
+  loginForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const email = $('#login-email').value.trim();
+    const password = $('#login-password').value.trim();
+    const btnSubmit = $('#btn-login-submit');
+    const errBox = $('#login-error');
+
+    if (errBox) errBox.style.display = 'none';
+
+    try {
+      if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.textContent = "Verificando..."; }
+      await signInWithEmailAndPassword(auth, email, password);
+      loginForm.reset();
+    } catch (err) {
+      console.error("Error al iniciar sesión:", err);
+      if (errBox) {
+        errBox.style.display = 'block';
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+          errBox.textContent = "El correo o la contraseña son incorrectos.";
+        } else {
+          errBox.textContent = "Error al conectar: " + err.message;
+        }
+      }
+    } finally {
+      if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.textContent = "Iniciar sesión"; }
+    }
+  };
+}
+
+// Login con Google
+const btnGoogle = $('#btn-google-login');
+if (btnGoogle) {
+  btnGoogle.onclick = async () => {
+    const provider = new GoogleAuthProvider();
+    const errBox = $('#login-error');
+    if (errBox) errBox.style.display = 'none';
+
+    try {
+      btnGoogle.disabled = true;
+      btnGoogle.style.opacity = '0.7';
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error("Error al iniciar sesión con Google:", err);
+      if (errBox) {
+        errBox.style.display = 'block';
+        if (err.code === 'auth/popup-closed-by-user') {
+          errBox.textContent = "Se ha cerrado la ventana de acceso con Google.";
+        } else {
+          errBox.textContent = "Error al conectar con Google: " + err.message;
+        }
+      }
+    } finally {
+      btnGoogle.disabled = false;
+      btnGoogle.style.opacity = '1';
+    }
+  };
+}
+
+// Botón de Cerrar Sesión
+const btnLogout = $('#btn-logout');
+if (btnLogout) {
+  btnLogout.onclick = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
+    }
+  };
+}
 
 // ----------------------------------------------------
 // NAVEGACIÓN Y PESTAÑAS
@@ -104,8 +276,9 @@ function renderTowns() {
   const venueTownSelect = $('#new-venue-town');
   if (venueTownSelect) {
     const currentVal = venueTownSelect.value;
-    venueTownSelect.innerHTML = towns.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
-    if (currentVal && towns.some(t => t.name === currentVal)) venueTownSelect.value = currentVal;
+    const availableTowns = towns.filter(t => isTownAllowed(t.name));
+    venueTownSelect.innerHTML = availableTowns.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+    if (currentVal && availableTowns.some(t => t.name === currentVal)) venueTownSelect.value = currentVal;
   }
 
   const listEl = $('#towns-list');
@@ -241,20 +414,25 @@ function getLocationDisplayName(loc) {
 function renderLocations() {
   const datalist = $('#locations-datalist');
   if (datalist) {
-    datalist.innerHTML = locations.map(loc => {
-      const disp = getLocationDisplayName(loc);
-      return `<option value="${disp}">`;
-    }).join('');
+    datalist.innerHTML = locations
+      .filter(loc => isTownAllowed(loc.town || (loc.name.match(/\(([^)]+)\)$/) ? loc.name.match(/\(([^)]+)\)$/)[1] : '')))
+      .map(loc => {
+        const disp = getLocationDisplayName(loc);
+        return `<option value="${disp}">`;
+      }).join('');
   }
 
   const listEl = $('#venues-list');
   if (!listEl) return;
 
   const searchQuery = ($('#admin-search-venues') ? $('#admin-search-venues').value : '').toLowerCase().trim();
-  const filteredLocations = locations.filter(loc => getLocationDisplayName(loc).toLowerCase().includes(searchQuery));
+  const filteredLocations = locations.filter(loc => {
+    const locTown = loc.town || (loc.name.match(/\(([^)]+)\)$/) ? loc.name.match(/\(([^)]+)\)$/)[1] : '');
+    return isTownAllowed(locTown) && getLocationDisplayName(loc).toLowerCase().includes(searchQuery);
+  });
 
   if (filteredLocations.length === 0) {
-    listEl.innerHTML = `<p class="muted">${searchQuery ? 'No hay lugares que coincidan con la búsqueda.' : 'No hay lugares creados aún.'}</p>`;
+    listEl.innerHTML = `<p class="muted">${searchQuery ? 'No hay lugares que coincidan con la búsqueda.' : 'No hay lugares creados o asignados a tus municipios.'}</p>`;
     return;
   }
 
@@ -385,14 +563,12 @@ async function loadEvents() {
   }
 }
 
-// Sembrado masivo: 20 Ubicaciones + 30 Eventos
 async function seedDatabase(force = false) {
   try {
     const btn = $('#btn-seed-data');
     if (btn) { btn.disabled = true; btn.textContent = "⏳ Generando 30 Eventos y 20 Lugares..."; }
 
     if (force) {
-      // Limpiar colecciones anteriores
       const evSnap = await getDocs(eventsRef);
       for (const d of evSnap.docs) { await deleteDoc(doc(db, "events", d.id)); }
       
@@ -400,7 +576,6 @@ async function seedDatabase(force = false) {
       for (const d of locSnap.docs) { await deleteDoc(doc(db, "locations", d.id)); }
     }
 
-    // 20 Lugares (10 Úbeda + 10 Baeza)
     const dummyLocations = [
       { name: 'Hospital de Santiago', town: 'Úbeda', mapsUrl: 'https://maps.app.goo.gl/6QN1Jj5r28aWBtUL7' },
       { name: 'Plaza Vázquez de Molina', town: 'Úbeda', mapsUrl: '' },
@@ -428,7 +603,6 @@ async function seedDatabase(force = false) {
       await addDoc(locationsRef, loc);
     }
 
-    // 30 Eventos variados
     const cats = ['Música', 'Patrimonio', 'Gastronomía', 'Talleres', 'Cine', 'Deporte'];
     const dummyEvents = [];
 
@@ -478,7 +652,6 @@ async function seedDatabase(force = false) {
 
     if (btn) { btn.disabled = false; btn.textContent = "⚡ Cargar 30 Eventos y 20 Lugares de prueba"; }
 
-    // Recargar datos
     await Promise.all([loadTowns(), loadLocations(), loadEvents()]);
     alert("¡Éxito! Se han creado 20 Ubicaciones y 30 Eventos de prueba.");
   } catch (err) {
@@ -524,7 +697,6 @@ function draw() {
 
   $('#count').textContent = shown.length + ' actividades';
 
-  // Cortar para Scroll Infinito
   const pageItems = shown.slice(0, visibleCount);
 
   // Renderizar tarjetas en Vista Ciudadana
@@ -560,7 +732,6 @@ function draw() {
     `;
   }).join('');
 
-  // Actualizar estado del Scroll Infinito (Sentinel)
   const sentinelText = $('#sentinel-text');
   if (sentinelText) {
     if (visibleCount >= shown.length) {
@@ -570,21 +741,20 @@ function draw() {
     }
   }
 
-  // Inicializar Observer si no existe
   setupScrollObserver(shown.length);
 
-  // Renderizar lista de Administración con filtro de búsqueda
   const adminEventsList = $('#admin-events-list');
   if (adminEventsList) {
     const adminSearchQuery = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
     const adminFilteredEvents = events.filter(e => 
-      e.title.toLowerCase().includes(adminSearchQuery) ||
-      e.category.toLowerCase().includes(adminSearchQuery) ||
-      (e.venue && e.venue.toLowerCase().includes(adminSearchQuery))
+      isTownAllowed(e.town) &&
+      (e.title.toLowerCase().includes(adminSearchQuery) ||
+       e.category.toLowerCase().includes(adminSearchQuery) ||
+       (e.venue && e.venue.toLowerCase().includes(adminSearchQuery)))
     );
 
     if (adminFilteredEvents.length === 0) {
-      adminEventsList.innerHTML = `<p class="muted">${adminSearchQuery ? 'No hay eventos que coincidan con la búsqueda.' : 'No hay eventos activos.'}</p>`;
+      adminEventsList.innerHTML = `<p class="muted">${adminSearchQuery ? 'No hay eventos que coincidan con la búsqueda.' : 'No hay eventos en tus municipios asignados.'}</p>`;
     } else {
       adminEventsList.innerHTML = adminFilteredEvents.map(e => `
         <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
@@ -621,17 +791,21 @@ function setupScrollObserver(totalShown) {
 }
 
 function updateSummaryStats() {
-  if ($('#summary-towns-count')) $('#summary-towns-count').textContent = towns.length;
+  const scopedTowns = towns.filter(t => isTownAllowed(t.name));
+  const scopedLocations = locations.filter(l => isTownAllowed(l.town || (l.name.match(/\(([^)]+)\)$/) ? l.name.match(/\(([^)]+)\)$/)[1] : '')));
+  const scopedEvents = events.filter(e => isTownAllowed(e.town));
+
+  if ($('#summary-towns-count')) $('#summary-towns-count').textContent = scopedTowns.length;
   if ($('#summary-cats-count')) $('#summary-cats-count').textContent = 6;
-  if ($('#summary-venues-count')) $('#summary-venues-count').textContent = locations.length;
-  if ($('#summary-events-count')) $('#summary-events-count').textContent = events.length;
+  if ($('#summary-venues-count')) $('#summary-venues-count').textContent = scopedLocations.length;
+  if ($('#summary-events-count')) $('#summary-events-count').textContent = scopedEvents.length;
 
   const recEventsEl = $('#summary-recent-events');
   if (recEventsEl) {
-    if (events.length === 0) {
+    if (scopedEvents.length === 0) {
       recEventsEl.innerHTML = `<p class="muted">No hay eventos recientes.</p>`;
     } else {
-      recEventsEl.innerHTML = events.slice(0, 5).map(e => `
+      recEventsEl.innerHTML = scopedEvents.slice(0, 5).map(e => `
         <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
           <b>${e.title}</b><br>
           <span class="muted" style="font-size:12px;">${e.category} · ${e.venue}</span>
@@ -642,10 +816,10 @@ function updateSummaryStats() {
 
   const recVenuesEl = $('#summary-recent-venues');
   if (recVenuesEl) {
-    if (locations.length === 0) {
+    if (scopedLocations.length === 0) {
       recVenuesEl.innerHTML = `<p class="muted">No hay lugares recientes.</p>`;
     } else {
-      recVenuesEl.innerHTML = locations.slice(0, 5).map(v => `
+      recVenuesEl.innerHTML = scopedLocations.slice(0, 5).map(v => `
         <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
           <b>${getLocationDisplayName(v)}</b>
         </div>
@@ -1001,6 +1175,166 @@ window.removePhoto = (e, idx) => {
   if (wasPri && uploadedPhotos.length) uploadedPhotos[0].isPrimary = true;
   renderThumbs();
 };
+
+// ----------------------------------------------------
+// GESTIÓN DE USUARIOS Y PERMISOS (RBAC - Exclusivo Superadmin)
+// ----------------------------------------------------
+async function loadUsers() {
+  if (!currentUserProfile || currentUserProfile.role !== 'superadmin') return;
+  try {
+    const snapshot = await getDocs(usersRef);
+    usersList = [];
+    snapshot.forEach(docSnap => {
+      usersList.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    renderUsers();
+    renderUserTownCheckboxes();
+  } catch (e) {
+    console.error("Error al cargar usuarios:", e);
+  }
+}
+
+function renderUsers() {
+  const listEl = $('#users-list');
+  if (!listEl) return;
+
+  const searchQuery = ($('#admin-search-users') ? $('#admin-search-users').value : '').toLowerCase().trim();
+  const filteredUsers = usersList.filter(u => (u.email || '').toLowerCase().includes(searchQuery));
+
+  if (filteredUsers.length === 0) {
+    listEl.innerHTML = `<p class="muted">${searchQuery ? 'No hay usuarios que coincidan.' : 'No hay usuarios registrados.'}</p>`;
+    return;
+  }
+
+  listEl.innerHTML = filteredUsers.map(u => {
+    const isSuper = u.role === 'superadmin';
+    const townsLabel = isSuper ? 'Todos (*)' : (u.allowedTowns && u.allowedTowns.length ? u.allowedTowns.join(', ') : 'Ninguno');
+    const roleBadge = isSuper 
+      ? `<span style="background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Superadmin</span>` 
+      : `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Gestor Municipal</span>`;
+
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+        <div>
+          <b style="font-size:15px; color:#0f172a;">${u.email || 'Sin email'}</b> ${roleBadge}<br>
+          <span class="muted" style="font-size:13px;">Municipios autorizados: <b>${townsLabel}</b></span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" style="padding:6px 12px; font-size:13px;" onclick="editUserPermissions('${u.id}')">Editar Permisos</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+if ($('#admin-search-users')) $('#admin-search-users').oninput = renderUsers;
+
+function renderUserTownCheckboxes(selectedTowns = []) {
+  const wrap = $('#user-towns-checkboxes');
+  if (!wrap) return;
+
+  if (towns.length === 0) {
+    wrap.innerHTML = `<p class="muted" style="margin:0;">No hay municipios registrados en la plataforma.</p>`;
+    return;
+  }
+
+  wrap.innerHTML = towns.map(t => {
+    const isChecked = selectedTowns.includes('*') || selectedTowns.includes(t.name);
+    return `
+      <label style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:normal; cursor:pointer;">
+        <input type="checkbox" class="user-town-cb" value="${t.name}" ${isChecked ? 'checked' : ''}>
+        ${t.name}
+      </label>
+    `;
+  }).join('');
+}
+
+window.editUserPermissions = (uid) => {
+  const u = usersList.find(item => item.id === uid || item.uid === uid);
+  if (!u) return;
+
+  $('#user-edit-uid').value = u.id || u.uid;
+  $('#user-edit-email').value = u.email || '';
+  $('#user-edit-role').value = u.role || 'editor';
+
+  renderUserTownCheckboxes(u.allowedTowns || []);
+  toggleTownsGroupVisibility();
+
+  $('#user-form-title').textContent = "Editar Permisos de Usuario";
+  if ($('#cancel-user-edit')) $('#cancel-user-edit').style.display = 'inline-block';
+};
+
+function toggleTownsGroupVisibility() {
+  const roleSelect = $('#user-edit-role');
+  const townsGroup = $('#user-towns-group');
+  if (roleSelect && townsGroup) {
+    townsGroup.style.display = roleSelect.value === 'superadmin' ? 'none' : 'block';
+  }
+}
+
+if ($('#user-edit-role')) {
+  $('#user-edit-role').onchange = toggleTownsGroupVisibility;
+}
+
+if ($('#save-user-permissions')) {
+  $('#save-user-permissions').onclick = async () => {
+    const uid = $('#user-edit-uid').value;
+    if (!uid) return alert('Selecciona un usuario de la lista para editar sus permisos.');
+
+    const role = $('#user-edit-role').value;
+    let allowedTowns = [];
+
+    if (role === 'superadmin') {
+      allowedTowns = ['*'];
+    } else {
+      const checkboxes = document.querySelectorAll('.user-town-cb:checked');
+      allowedTowns = Array.from(checkboxes).map(cb => cb.value);
+      if (allowedTowns.length === 0) {
+        return alert('Debes seleccionar al menos un municipio para este gestor municipal.');
+      }
+    }
+
+    try {
+      $('#save-user-permissions').disabled = true;
+      $('#save-user-permissions').textContent = "Guardando...";
+
+      await updateDoc(doc(db, "users", uid), {
+        role: role,
+        allowedTowns: allowedTowns
+      });
+
+      const toast = $('#toast-user');
+      if (toast) {
+        toast.style.display = 'inline-block';
+        setTimeout(() => toast.style.display = 'none', 3000);
+      }
+
+      if (currentUserProfile && (currentUserProfile.uid === uid || currentUserProfile.id === uid)) {
+        currentUserProfile.role = role;
+        currentUserProfile.allowedTowns = allowedTowns;
+        updateUserRoleUI();
+      }
+
+      await loadUsers();
+    } catch (e) {
+      console.error("Error al actualizar permisos:", e);
+      alert("Error al actualizar permisos: " + e.message);
+    } finally {
+      $('#save-user-permissions').disabled = false;
+      $('#save-user-permissions').textContent = "Guardar Permisos";
+    }
+  };
+}
+
+if ($('#cancel-user-edit')) {
+  $('#cancel-user-edit').onclick = () => {
+    $('#user-edit-uid').value = '';
+    $('#user-edit-email').value = '';
+    $('#user-edit-role').value = 'editor';
+    renderUserTownCheckboxes([]);
+    if ($('#cancel-user-edit')) $('#cancel-user-edit').style.display = 'none';
+  };
+}
 
 // Carga Inicial
 Promise.all([loadTowns(), loadLocations(), loadEvents()]);
