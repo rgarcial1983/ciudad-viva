@@ -23,6 +23,7 @@
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
+      <button id="pwa-install-btn" class="btn-primary" style="padding:8px 14px; gap:6px; display:inline-flex; align-items:center; background:#2563eb; color:#ffffff; border:0; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" title="Instalar aplicación en tu dispositivo">📲 Instalar App</button>
       <button id="theme-toggle" class="btn-secondary" style="padding:8px 14px;" title="Cambiar tema">🌙 Modo Oscuro</button>
     </div>
   </header>
@@ -154,6 +155,65 @@
 
 <script type="module" src="js/citizen.js"></script>
 <script>
+let deferredPrompt = null;
+const installBtn = document.getElementById('pwa-install-btn');
+
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+if (isStandalone && installBtn) {
+  installBtn.style.display = 'none';
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (installBtn && !isStandalone) {
+    installBtn.style.display = 'inline-flex';
+  }
+});
+
+if (installBtn) {
+  installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installBtn.style.display = 'none';
+      }
+      deferredPrompt = null;
+    } else {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isIOS) {
+        Swal.fire({
+          title: '📲 Instalar Ciudad Viva en tu iPhone / iPad',
+          html: '<div style="text-align:left; font-size:14px; line-height:1.6;"><p>Para instalar la app en iOS:</p><ol><li>Pulsa el botón <b>Compartir</b> <span style="font-size:18px;">⎋</span> en la barra inferior de Safari.</li><li>Desplázate y selecciona <b>"Añadir a la pantalla de inicio"</b> <span style="font-size:18px;">➕</span>.</li><li>¡Listo! Ya tendrás Ciudad Viva como app nativa.</li></ol></div>',
+          icon: 'info',
+          confirmButtonText: '¡Entendido!'
+        });
+      } else {
+        Swal.fire({
+          title: '📲 Instalar Ciudad Viva',
+          html: '<div style="text-align:left; font-size:14px; line-height:1.6;"><p>Para instalar la app en tu navegador:</p><ol><li>Abre el menú desplegable del navegador (los tres puntos <b>⋮</b> o 🛠️ arriba a la derecha).</li><li>Haz clic en <b>"Instalar aplicación"</b> o <b>"Añadir a la pantalla de inicio"</b>.</li><li>¡Listo! Podrás acceder directamente desde tu inicio.</li></ol></div>',
+          icon: 'info',
+          confirmButtonText: '¡Entendido!'
+        });
+      }
+    }
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  if (installBtn) installBtn.style.display = 'none';
+  deferredPrompt = null;
+  Swal.fire({
+    title: '¡Aplicación Instalada! 🎉',
+    text: 'Ciudad Viva ya está disponible en tu pantalla de inicio.',
+    icon: 'success',
+    timer: 3000,
+    showConfirmButton: false
+  });
+});
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
