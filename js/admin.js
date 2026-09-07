@@ -651,7 +651,7 @@ function renderAdminEvents() {
       <div class="admin-list-item">
         <div>
           <b style="font-size:15px;">${e.title}</b><br>
-          <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${e.dateLabel || e.time}) · <b>${e.town}</b></span>
+          <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${getEventDateLabel(e)} · ${e.time}) · <b>${e.town}</b></span>
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn-action-edit" onclick="editEvent('${e.id}')">✏️ Editar</button>
@@ -729,7 +729,7 @@ function exportAgendaPDF() {
   filteredEvents.forEach(e => {
     html += `
       <tr style="border-bottom: 1px solid #e2e8f0;">
-        <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${e.dateLabel || 'Próximamente'}<br><span style="font-weight:normal; font-size:11px; color:#64748b;">${e.time || '20:00'}</span></td>
+        <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${getEventDateLabel(e)}<br><span style="font-weight:normal; font-size:11px; color:#64748b;">${e.time || '20:00'}</span></td>
         <td style="padding:8px 10px;"><b style="font-size:13px; color:#0f172a;">${e.title}</b><br><span style="color:#475569; font-size:11px;">${(e.description || '').slice(0, 90)}${(e.description || '').length > 90 ? '...' : ''}</span></td>
         <td style="padding:8px 10px; font-weight:600; color:#2563eb;">${e.category}</td>
         <td style="padding:8px 10px;">${e.venue}<br><span style="font-weight:600; color:#64748b; font-size:11px;">${e.town}</span></td>
@@ -816,11 +816,38 @@ if ($('#btn-new-event')) {
 
 function formatDateLabel(dateStr) {
   if (!dateStr) return 'Próximamente';
-  const d = new Date(dateStr + 'T00:00:00');
-  if (isNaN(d)) return dateStr;
+  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const d = new Date(cleanStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
 
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${d.getDate()} ${months[d.getMonth()]}`;
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function getEventDateLabel(e) {
+  if (!e) return 'Próximamente';
+  if (e.dateRaw) return formatDateLabel(e.dateRaw);
+  if (e.date && e.date.includes('-')) return formatDateLabel(e.date);
+  if (e.dateLabel) {
+    if (e.dateLabel.includes(',')) return e.dateLabel;
+    const m = e.dateLabel.match(/^(\d{1,2})\s+([A-Za-záéíóúÁÉÍÓÚ]+)(?:\s+(\d{4}))?$/);
+    if (m) {
+      const dayNum = parseInt(m[1], 10);
+      const monthStr = m[2].toLowerCase().slice(0, 3);
+      const yearNum = m[3] ? parseInt(m[3], 10) : 2026;
+      const monthMap = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11 };
+      if (monthStr in monthMap) {
+        const d = new Date(yearNum, monthMap[monthStr], dayNum);
+        if (!isNaN(d.getTime())) {
+          const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+          return `${days[d.getDay()]}, ${e.dateLabel}`;
+        }
+      }
+    }
+    return e.dateLabel;
+  }
+  return 'Próximamente';
 }
 
 window.editEvent = (id) => {
@@ -1340,7 +1367,7 @@ window.openDetail = function(id) {
   if ($('#dtag')) $('#dtag').textContent = e.category;
   if ($('#dtitle')) $('#dtitle').textContent = e.title;
   if ($('#ddesc')) $('#ddesc').textContent = e.description;
-  if ($('#dwhen')) $('#dwhen').textContent = (e.dateLabel || 'Próximamente') + ' · ' + e.time;
+  if ($('#dwhen')) $('#dwhen').textContent = getEventDateLabel(e) + ' · ' + e.time;
   
   const isFree = (e.price || '').toLowerCase().includes('gratis');
   const priceBadge = $('#dprice-badge');

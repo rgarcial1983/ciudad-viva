@@ -14,6 +14,42 @@ let observer = null;
 
 const $ = s => document.querySelector(s);
 
+function formatDateLabel(dateStr) {
+  if (!dateStr) return 'Próximamente';
+  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const d = new Date(cleanStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function getEventDateLabel(e) {
+  if (!e) return 'Próximamente';
+  if (e.dateRaw) return formatDateLabel(e.dateRaw);
+  if (e.date && e.date.includes('-')) return formatDateLabel(e.date);
+  if (e.dateLabel) {
+    if (e.dateLabel.includes(',')) return e.dateLabel;
+    const m = e.dateLabel.match(/^(\d{1,2})\s+([A-Za-záéíóúÁÉÍÓÚ]+)(?:\s+(\d{4}))?$/);
+    if (m) {
+      const dayNum = parseInt(m[1], 10);
+      const monthStr = m[2].toLowerCase().slice(0, 3);
+      const yearNum = m[3] ? parseInt(m[3], 10) : 2026;
+      const monthMap = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11 };
+      if (monthStr in monthMap) {
+        const d = new Date(yearNum, monthMap[monthStr], dayNum);
+        if (!isNaN(d.getTime())) {
+          const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+          return `${days[d.getDay()]}, ${e.dateLabel}`;
+        }
+      }
+    }
+    return e.dateLabel;
+  }
+  return 'Próximamente';
+}
+
 // ----------------------------------------------------
 // MODO OSCURO (Dark Mode)
 // ----------------------------------------------------
@@ -369,7 +405,7 @@ function draw() {
         return `
           <article class="card">
             <div class="visual" style="${bgStyle}">
-              <span class="pill-time">${e.dateLabel || e.date || 'Próximamente'} · ${e.time || ''}</span>
+              <span class="pill-time">${getEventDateLabel(e)} · ${e.time || ''}</span>
               <button class="btn-fav ${isFav ? 'is-fav' : ''}" title="${isFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}" onclick="toggleFavorite('${e.id}', event)">
                 ${isFav ? '❤️' : '🤍'}
               </button>
@@ -384,7 +420,7 @@ function draw() {
               <h4>${e.title}</h4>
               <p class="venue">🗺️ ${e.venue}</p>
               <div class="card-footer">
-                <span class="muted">${e.dateLabel || 'Próximamente'}</span>
+                <span class="muted">${getEventDateLabel(e)}</span>
                 <button class="btn-detail" onclick="openDetail('${e.id}')">Ver detalle →</button>
               </div>
             </div>
@@ -565,7 +601,7 @@ window.openDetail = function(id) {
   if ($('#dtag')) $('#dtag').textContent = e.category;
   if ($('#dtitle')) $('#dtitle').textContent = e.title;
   if ($('#ddesc')) $('#ddesc').textContent = e.description;
-  if ($('#dwhen')) $('#dwhen').textContent = (e.dateLabel || 'Próximamente') + ' · ' + e.time;
+  if ($('#dwhen')) $('#dwhen').textContent = getEventDateLabel(e) + ' · ' + e.time;
   
   const isFree = (e.price || '').toLowerCase().includes('gratis');
   const priceBadge = $('#dprice-badge');
