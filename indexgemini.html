@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Ciudad Viva · Agenda municipal</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f6f8; color: #15202b; font: 15px/1.45 Inter, system-ui, -apple-system, Segoe UI, sans-serif; }
+    .app { max-width: 1240px; margin: auto; padding: 28px; }
+    .top { display: flex; justify-content: space-between; gap: 18px; align-items: center; border-bottom: 1px solid #dce3e8; padding-bottom: 20px; }
+    .brand h1 { margin: 0; font-size: 24px; letter-spacing: -0.6px; }
+    .brand p { margin: 3px 0 0; color: #62717e; }
+    .tabs, .filters, .row { display: flex; gap: 8px; align-items: center; }
+    .tab, .chip, button { border: 1px solid #ccd6dd; background: white; border-radius: 8px; padding: 8px 12px; cursor: pointer; font: inherit; color: inherit; }
+    .tab.on, button.primary { background: #0f6674; color: white; border-color: #0f6674; }
+    .view { display: none; margin-top: 24px; }
+    .view.on { display: block; }
+    .hero { background: #123c46; color: white; border-radius: 14px; padding: 28px; margin-bottom: 25px; }
+    .hero h2 { margin: 0 0 5px; font-size: 25px; }
+    .hero p { margin: 0 0 20px; color: #d6e9ec; }
+    .filters { background: #fff; border-radius: 9px; padding: 9px; }
+    .filters input, .filters select, .form input, .form select, .form textarea { border: 1px solid #ccd6dd; border-radius: 7px; padding: 10px; background: white; font: inherit; min-width: 0; }
+    .filters input { flex: 2; }
+    .filters select { flex: 1; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; margin: 8px 0 14px; }
+    .section-title h2 { margin: 0; font-size: 19px; }
+    .muted { color: #62717e; font-size: 13px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: #fff; border: 1px solid #dde5ea; border-radius: 12px; overflow: hidden; }
+    .card .visual { height: 140px; background: #e4eff1; display: flex; align-items: end; padding: 13px; color: #174b57; font-weight: 700; background-size: cover; background-position: center; position: relative; }
+    .card .visual.has-img { color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+    .card .visual.has-img::before { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 60%); }
+    .card .visual span { position: relative; z-index: 1; }
+    .card .visual .badge-gallery { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; font-size: 11px; padding: 3px 8px; border-radius: 12px; z-index: 2; }
+    .card-body { padding: 15px; }
+    .meta { display: flex; justify-content: space-between; color: #62717e; font-size: 13px; }
+    .tag { font-size: 12px; border: 1px solid #d5dfe4; border-radius: 20px; padding: 2px 8px; color: #3f5662; }
+    .card h3 { font-size: 17px; line-height: 1.25; margin: 12px 0 5px; }
+    .card p { margin: 0 0 14px; color: #62717e; font-size: 13px; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .link { color: #0f6674; border: 0; background: transparent; padding: 0; font-weight: 700; }
+    
+    /* Modal de detalle */
+    .detail { position: fixed; inset: 0; background: #15202b80; display: none; align-items: center; justify-content: center; padding: 18px; z-index: 1000; }
+    .detail.on { display: flex; }
+    .modal { background: white; border-radius: 14px; max-width: 680px; width: 100%; padding: 26px; position: relative; max-height: 90vh; overflow-y: auto; }
+    .modal-head-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .btn-back-link { background: transparent; border: 0; color: #0f6674; font-weight: 700; font-size: 14px; cursor: pointer; padding: 4px 0; display: flex; align-items: center; gap: 4px; }
+    .close { border: 0; background: transparent; font-size: 24px; cursor: pointer; color: #62717e; line-height: 1; }
+    .modal h2 { font-size: 24px; margin: 8px 0 10px; }
+    .info { background: #f2f7f8; padding: 16px; border-radius: 9px; margin-top: 18px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-secondary { background: #edf2f5; border: 1px solid #ccd6dd; color: #15202b; }
+
+    /* Mosaico dinámico en el modal: 1 grande + 2 pequeñas */
+    .modal-gallery { display: grid; gap: 8px; margin-bottom: 16px; border-radius: 10px; overflow: hidden; }
+    .modal-gallery.count-1 { grid-template-columns: 1fr; }
+    .modal-gallery.count-1 .main-photo { height: 230px; }
+    .modal-gallery.count-2 { grid-template-columns: 1fr 1fr; }
+    .modal-gallery.count-2 img { height: 210px; }
+    .modal-gallery.count-3 { grid-template-columns: 2fr 1fr; grid-template-rows: 110px 110px; }
+    .modal-gallery.count-3 .main-photo { grid-row: span 2; height: 228px; }
+    .modal-gallery.count-3 .sub-photo { height: 110px; }
+    .modal-gallery img { width: 100%; object-fit: cover; border-radius: 6px; cursor: pointer; transition: opacity 0.2s, transform 0.2s; }
+    .modal-gallery img:hover { opacity: 0.92; transform: scale(1.01); }
+
+    /* LIGHTBOX CINE INMERSIVO */
+    .lightbox { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.94); display: none; align-items: center; justify-content: center; z-index: 2000; touch-action: pan-y; }
+    .lightbox.on { display: flex; }
+    .lightbox-img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 6px; user-select: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    .lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,0.18); border: 0; color: white; width: 50px; height: 50px; border-radius: 50%; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .lb-nav:hover { background: rgba(255,255,255,0.35); }
+    .lb-prev { left: 20px; }
+    .lb-next { right: 20px; }
+    .lb-close { position: absolute; top: 20px; right: 24px; background: transparent; border: 0; color: white; font-size: 32px; cursor: pointer; }
+    .lb-counter { position: absolute; bottom: 24px; color: rgba(255,255,255,0.8); font-size: 14px; background: rgba(0,0,0,0.5); padding: 4px 14px; border-radius: 20px; letter-spacing: 1px; }
+
+    /* Panel de administración */
+    .admin { display: grid; grid-template-columns: 190px 1fr; gap: 24px; }
+    .side { display: flex; flex-direction: column; gap: 7px; }
+    .side button { text-align: left; border: 0; background: transparent; }
+    .side button.on { background: #dceff1; color: #0d5966; font-weight: 700; }
+    .dashboard-head { display: flex; justify-content: space-between; align-items: center; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+    .stat { background: white; border: 1px solid #dde5ea; border-radius: 10px; padding: 16px; }
+    .stat b { font-size: 25px; display: block; }
+    .admin-grid { display: grid; grid-template-columns: 1fr 1.35fr; gap: 16px; }
+    .panel { background: #fff; border: 1px solid #dde5ea; border-radius: 11px; padding: 19px; }
+    .panel h3 { margin-top: 0; }
+    .form { display: grid; gap: 10px; }
+    .form textarea { resize: vertical; }
+    .eventline { display: flex; gap: 9px; padding: 10px 0; border-bottom: 1px solid #edf1f3; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #0f6674; margin-top: 6px; }
+    .toast { display: none; margin-top: 10px; color: #0f6674; font-size: 13px; }
+    .toast.on { display: block; }
+
+    /* Drop & Glow con soporte Multi-foto */
+    .drop-zone { border: 2px dashed #ccd6dd; border-radius: 10px; padding: 14px; text-align: center; cursor: pointer; background: #fafbfc; transition: all 0.2s ease; position: relative; min-height: 100px; }
+    .drop-zone.dragover { border-color: #0f6674; background: #eaf4f6; }
+    .drop-content p { margin: 4px 0 2px; font-size: 13px; }
+    
+    .thumbs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+    .thumb-slot { position: relative; height: 88px; border-radius: 8px; overflow: hidden; border: 2px solid #ccd6dd; background: #eee; cursor: pointer; transition: border-color 0.2s; }
+    .thumb-slot.is-primary { border-color: #0f6674; box-shadow: 0 0 0 2px rgba(15, 102, 116, 0.3); }
+    .thumb-slot img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb-slot .badge-cover { position: absolute; bottom: 4px; left: 4px; font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: bold; background: rgba(0,0,0,0.6); color: #ccc; }
+    .thumb-slot.is-primary .badge-cover { background: #0f6674; color: #fff; }
+    .thumb-slot .btn-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); color: white; border: 0; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    @media (max-width: 760px) {
+      .app { padding: 16px; }
+      .top, .filters, .dashboard-head { align-items: stretch; flex-direction: column; }
+      .cards, .admin-grid, .admin { grid-template-columns: 1fr; }
+      .side { flex-direction: row; overflow: auto; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .filters input, .filters select { width: 100%; }
+      .modal-gallery.count-3 { grid-template-columns: 1fr; grid-template-rows: auto; }
+      .modal-gallery.count-3 .main-photo { height: 180px; }
+      .modal-gallery.count-3 .sub-photo { height: 120px; }
+      .lb-nav { width: 42px; height: 42px; font-size: 20px; }
+      .lb-prev { left: 8px; }
+      .lb-next { right: 8px; }
+    }
+  </style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Ciudad Viva</h1>
+      <p>Prototipo de gestión y consulta de eventos municipales</p>
+    </div>
+    <nav class="tabs">
+      <button class="tab" data-view="admin">Administración</button>
+      <button class="tab on" data-view="citizen">Vista ciudadana</button>
+    </nav>
+  </header>
+
+  <!-- Vista Ciudadana -->
+  <section id="citizen" class="view on">
+    <div class="hero">
+      <h2>Agenda ciudadana</h2>
+      <p>Encuentra planes cerca de ti: cultura, deporte, gastronomía y mucho más.</p>
+      <div class="filters">
+        <input id="search" placeholder="Buscar evento">
+        <select id="category">
+          <option value="">Todas las categorías</option>
+          <option>Música</option>
+          <option>Gastronomía</option>
+          <option>Talleres</option>
+          <option>Cine</option>
+          <option>Patrimonio</option>
+          <option>Deporte</option>
+        </select>
+        <select id="town">
+          <option value="">Todos los municipios</option>
+          <option>Úbeda</option>
+          <option>Baeza</option>
+        </select>
+        <select id="date">
+          <option value="">Próximos 30 días</option>
+          <option>Hoy</option>
+          <option>Mañana</option>
+          <option>Domingo</option>
+        </select>
+      </div>
+    </div>
+    <div class="section-title">
+      <h2>Eventos disponibles</h2>
+      <span id="count" class="muted"></span>
+    </div>
+    <div id="cards" class="cards"></div>
+  </section>
+
+  <!-- Vista Administración -->
+  <section id="admin" class="view">
+    <div class="admin">
+      <aside class="side">
+        <b>Administración</b>
+        <button class="on">Resumen</button>
+        <button>Municipios</button>
+        <button>Categorías</button>
+        <button>Lugares</button>
+        <button>Eventos</button>
+      </aside>
+      <div>
+        <div class="dashboard-head">
+          <div>
+            <h2 style="margin:0">Eventos</h2>
+            <p class="muted">Gestiona la información que verá la ciudadanía.</p>
+          </div>
+          <button class="primary">Nuevo evento</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>2</b><span class="muted">Municipios</span></div>
+          <div class="stat"><b>6</b><span class="muted">Categorías</span></div>
+          <div class="stat"><b>8</b><span class="muted">Lugares activos</span></div>
+          <div class="stat"><b id="admin-count">6</b><span class="muted">Eventos publicados</span></div>
+        </div>
+        <div class="admin-grid">
+          <div class="panel">
+            <h3>Alta rápida de evento</h3>
+            <div class="form">
+              <input id="new-title" placeholder="Título del evento">
+              <select id="new-cat">
+                <option>Música</option>
+                <option>Gastronomía</option>
+                <option>Talleres</option>
+                <option>Cine</option>
+                <option>Patrimonio</option>
+                <option>Deporte</option>
+              </select>
+              <select id="new-venue">
+                <option>Hospital de Santiago (Úbeda)</option>
+                <option>Plaza Vázquez de Molina (Úbeda)</option>
+                <option>Teatro Ideal Cinema (Úbeda)</option>
+                <option>Parque de la Alameda</option>
+              </select>
+              <textarea id="new-desc" rows="2" placeholder="Descripción breve del evento...">20 de septiembre · 19:00 · Entrada libre hasta completar aforo.</textarea>
+              
+              <!-- Subida hasta 3 fotos -->
+              <div id="drop-zone" class="drop-zone">
+                <input type="file" id="poster-input" accept="image/*" multiple style="display:none">
+                <div id="drop-content" class="drop-content">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0f6674" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  <p><b>Arrastra fotos o pulsa</b> (Máx. 3 imágenes)</p>
+                  <span class="muted" id="slots-info">3 huecos disponibles · Pulsa una foto para marcar portada</span>
+                </div>
+              </div>
+
+              <!-- Tira interactiva de miniaturas -->
+              <div id="thumbs-container" class="thumbs-grid" style="display:none"></div>
+
+              <button class="primary" id="save">Guardar borrador</button>
+              <span class="toast" id="toast">Evento guardado con sus imágenes optimizadas.</span>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Eventos recientes</h3>
+            <div id="recent"></div>
+          </div>
+        </div>
+        <p class="muted">Regla de rendimiento: la agenda pública solo permite consultar un intervalo máximo de 30 días.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Modal de detalle con botón dual de retorno y mosaico -->
+<div id="detail" class="detail">
+  <article class="modal">
+    <div class="modal-head-nav">
+      <button class="btn-back-link" onclick="closeDetail()">← Volver a la agenda</button>
+      <button class="close" onclick="closeDetail()" title="Cerrar ficha">×</button>
+    </div>
+    
+    <div id="modal-gallery" class="modal-gallery" style="display:none"></div>
+    <span id="dtag" class="tag"></span>
+    <h2 id="dtitle"></h2>
+    <p id="ddesc" class="muted"></p>
+    <div class="info">
+      <b>Información práctica</b>
+      <p><b>Cuándo:</b> <span id="dwhen"></span></p>
+      <p><b>Dónde:</b> <span id="dwhere"></span></p>
+      <p><b>Precio:</b> <span id="dprice"></span></p>
+      <div class="modal-actions">
+        <button class="primary">Añadir a mi agenda</button>
+        <button class="btn-secondary" onclick="closeDetail()">← Volver a la agenda</button>
+      </div>
+    </div>
+  </article>
+</div>
+
+<!-- LIGHTBOX CINE INMERSIVO -->
+<div id="lightbox" class="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">×</button>
+  <button class="lb-nav lb-prev" onclick="prevLightboxPhoto()">‹</button>
+  <img id="lb-img" class="lightbox-img" src="" alt="Cartel a pantalla completa">
+  <button class="lb-nav lb-next" onclick="nextLightboxPhoto()">›</button>
+  <div id="lb-counter" class="lb-counter">1 / 1</div>
+</div>
+
+<script>
+// Eventos iniciales
+let events = [
+  ['Concierto de Música Renacentista', 'Música', 'Úbeda', 'Hoy', '12 Sep', '20:30', 'Hospital de Santiago', 'Gratis', 'Un recorrido por piezas clásicas del Renacimiento en un entorno histórico incomparable.', [], 0],
+  ['Ruta del Tapeo y Aceite de Oliva', 'Gastronomía', 'Úbeda', 'Hoy', '12 Sep', '13:00', 'Plaza del Mercado', 'Gratis', 'Degustación guiada de los mejores aceites virgen extra de la comarca con tapas locales.', [], 0],
+  ['Taller de alfarería tradicional', 'Talleres', 'Úbeda', 'Mañana', '13 Sep', '11:00', 'Alfarería Paco Tito', '10 €', 'Aprende a moldear piezas de barro vidriado con artesanos ubetenses.', [], 0],
+  ['Cine de verano en el casco antiguo', 'Cine', 'Úbeda', 'Mañana', '13 Sep', '22:00', 'Plaza Vázquez de Molina', '3 €', 'Proyección al aire libre con la fachada de El Salvador como telón de fondo.', [], 0],
+  ['Paseo nocturno: Leyendas de Úbeda', 'Patrimonio', 'Úbeda', 'Domingo', '14 Sep', '21:00', 'Plaza Primero de Mayo', '5 €', 'Descubre los misterios, palacios y rincones ocultos de la ciudad patrimonio.', [], 0],
+  ['Torneo local de pádel', 'Deporte', 'Baeza', 'Domingo', '14 Sep', '18:00', 'Polideportivo Municipal', 'Gratis', 'Fase final del campeonato comarcal.', [], 0]
+];
+
+let uploadedPhotos = [];
+let activeGalleryPhotos = [];
+let currentLightboxIdx = 0;
+
+const $ = s => document.querySelector(s);
+
+function draw() {
+  let q = $('#search').value.toLowerCase();
+  let c = $('#category').value;
+  let t = $('#town').value;
+  let d = $('#date').value;
+
+  let shown = events.filter(e => 
+    e[0].toLowerCase().includes(q) &&
+    (!c || e[1] === c) &&
+    (!t || e[2] === t) &&
+    (!d || e[3] === d)
+  );
+
+  $('#count').textContent = shown.length + ' resultados';
+
+  $('#cards').innerHTML = shown.map((e) => {
+    const photos = e[9] || [];
+    const primaryIndex = e[10] || 0;
+    const coverUrl = photos[primaryIndex] || photos[0];
+    const hasImg = !!coverUrl;
+    const bgStyle = hasImg ? `background-image:url('${coverUrl}');` : '';
+    const visualClass = hasImg ? 'visual has-img' : 'visual';
+    const galleryBadge = photos.length > 1 ? `<span class="badge-gallery">1/${photos.length} fotos</span>` : '';
+
+    return `
+      <article class="card">
+        <div class="${visualClass}" style="${bgStyle}">
+          ${galleryBadge}
+          <span>${e[2]}</span>
+        </div>
+        <div class="card-body">
+          <div class="meta">
+            <span>${e[4]} · ${e[5]}</span>
+            <span class="tag">${e[1]}</span>
+          </div>
+          <h3>${e[0]}</h3>
+          <p>${e[6]}</p>
+          <div class="card-footer">
+            <span>${e[3]} · ${e[7]}</span>
+            <button class="link" onclick="openDetail(${events.indexOf(e)})">Ver detalle</button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  $('#recent').innerHTML = events.slice(0, 5).map(e => `
+    <div class="eventline">
+      <span class="dot"></span>
+      <div>
+        <b>${e[0]}</b><br>
+        <span class="muted">${e[4]} · ${e[6]} (${e[2]})</span>
+      </div>
+    </div>
+  `).join('');
+
+  $('#admin-count').textContent = events.length;
+}
+
+function openDetail(i) {
+  let e = events[i];
+  $('#dtag').textContent = e[1];
+  $('#dtitle').textContent = e[0];
+  $('#ddesc').textContent = e[8];
+  $('#dwhen').textContent = e[4] + ', ' + e[5];
+  $('#dwhere').textContent = e[6] + ', ' + e[2];
+  $('#dprice').textContent = e[7];
+
+  const galleryEl = $('#modal-gallery');
+  const photos = e[9] || [];
+  const primaryIdx = e[10] || 0;
+
+  if (photos.length > 0) {
+    const sorted = [...photos];
+    if (primaryIdx > 0 && primaryIdx < sorted.length) {
+      const p = sorted.splice(primaryIdx, 1)[0];
+      sorted.unshift(p);
+    }
+    activeGalleryPhotos = sorted;
+
+    galleryEl.style.display = 'grid';
+    galleryEl.className = `modal-gallery count-${sorted.length}`;
+
+    if (sorted.length === 1) {
+      galleryEl.innerHTML = `<img src="${sorted[0]}" class="main-photo" alt="Cartel principal" onclick="openLightbox(0)">`;
+    } else if (sorted.length === 2) {
+      galleryEl.innerHTML = `
+        <img src="${sorted[0]}" class="main-photo" alt="Foto principal" onclick="openLightbox(0)">
+        <img src="${sorted[1]}" class="sub-photo" alt="Foto secundaria" onclick="openLightbox(1)">
+      `;
+    } else {
+      galleryEl.innerHTML = `
+        <img src="${sorted[0]}" class="main-photo" alt="Foto principal" onclick="openLightbox(0)">
+        <img src="${sorted[1]}" class="sub-photo" alt="Detalle 1" onclick="openLightbox(1)">
+        <img src="${sorted[2]}" class="sub-photo" alt="Detalle 2" onclick="openLightbox(2)">
+      `;
+    }
+  } else {
+    activeGalleryPhotos = [];
+    galleryEl.style.display = 'none';
+  }
+
+  $('#detail').classList.add('on');
+}
+window.openDetail = openDetail;
+
+function closeDetail() {
+  $('#detail').classList.remove('on');
+}
+window.closeDetail = closeDetail;
+
+// --- LÓGICA LIGHTBOX CINE INMERSIVO ---
+function openLightbox(index) {
+  if (!activeGalleryPhotos.length) return;
+  currentLightboxIdx = index;
+  updateLightbox();
+  $('#lightbox').classList.add('on');
+}
+window.openLightbox = openLightbox;
+
+function closeLightbox() {
+  $('#lightbox').classList.remove('on');
+}
+window.closeLightbox = closeLightbox;
+
+function updateLightbox() {
+  $('#lb-img').src = activeGalleryPhotos[currentLightboxIdx];
+  $('#lb-counter').textContent = `${currentLightboxIdx + 1} / ${activeGalleryPhotos.length}`;
+  
+  // Si solo hay 1 foto, ocultamos las flechas
+  const showNav = activeGalleryPhotos.length > 1;
+  $('.lb-prev').style.display = showNav ? 'flex' : 'none';
+  $('.lb-next').style.display = showNav ? 'flex' : 'none';
+}
+
+function prevLightboxPhoto() {
+  currentLightboxIdx = (currentLightboxIdx - 1 + activeGalleryPhotos.length) % activeGalleryPhotos.length;
+  updateLightbox();
+}
+window.prevLightboxPhoto = prevLightboxPhoto;
+
+function nextLightboxPhoto() {
+  currentLightboxIdx = (currentLightboxIdx + 1) % activeGalleryPhotos.length;
+  updateLightbox();
+}
+window.nextLightboxPhoto = nextLightboxPhoto;
+
+// Atajos de teclado y clics de cierre fuera
+window.addEventListener('keydown', (e) => {
+  if ($('#lightbox').classList.contains('on')) {
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') prevLightboxPhoto();
+    if (e.key === 'ArrowRight') nextLightboxPhoto();
+  } else if ($('#detail').classList.contains('on')) {
+    if (e.key === 'Escape') closeDetail();
+  }
+});
+
+$('#lightbox').onclick = (e) => {
+  if (e.target === $('#lightbox')) closeLightbox();
+};
+
+// Soporte táctil básico para móviles (swipe horizontal en Lightbox)
+let touchStartX = 0;
+$('#lightbox').addEventListener('touchstart', (e) => {
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+
+$('#lightbox').addEventListener('touchend', (e) => {
+  let touchEndX = e.changedTouches[0].screenX;
+  if (touchEndX < touchStartX - 40) nextLightboxPhoto();
+  if (touchEndX > touchStartX + 40) prevLightboxPhoto();
+}, { passive: true });
+
+// Navegación de pestañas
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tab, .view').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  $('#' + b.dataset.view).classList.add('on');
+});
+
+['search', 'category', 'town', 'date'].forEach(id => $('#' + id).oninput = draw);
+$('#detail').onclick = e => { if (e.target === $('#detail')) closeDetail(); };
+
+// --- GESTIÓN MULTI-FOTO EN ADMINISTRACIÓN ---
+const dropZone = $('#drop-zone');
+const fileInput = $('#poster-input');
+const thumbsContainer = $('#thumbs-container');
+const slotsInfo = $('#slots-info');
+
+dropZone.addEventListener('click', () => {
+  if (uploadedPhotos.length < 3) fileInput.click();
+});
+
+['dragover', 'dragenter'].forEach(e => dropZone.addEventListener(e, (evt) => {
+  evt.preventDefault();
+  dropZone.classList.add('dragover');
+}));
+
+['dragleave', 'drop'].forEach(e => dropZone.addEventListener(e, (evt) => {
+  evt.preventDefault();
+  dropZone.classList.remove('dragover');
+}));
+
+dropZone.addEventListener('drop', (e) => {
+  if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) handleFiles(e.target.files);
+});
+
+function handleFiles(fileList) {
+  const files = Array.from(fileList);
+  const remainingSlots = 3 - uploadedPhotos.length;
+
+  if (remainingSlots <= 0) {
+    alert('Ya has alcanzado el límite de 3 imágenes para este evento.');
+    return;
+  }
+
+  const allowedFiles = files.slice(0, remainingSlots);
+
+  allowedFiles.forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert(`El archivo ${file.name} supera el límite de 2 MB.`);
+      return;
+    }
+
+    compressImage(file, (optimizedWebp) => {
+      const isFirst = uploadedPhotos.length === 0;
+      uploadedPhotos.push({
+        url: optimizedWebp,
+        isPrimary: isFirst
+      });
+      renderThumbs();
+    });
+  });
+}
+
+function compressImage(file, callback) {
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = (event) => {
+    const img = new Image();
+    img.src = event.target.result;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_WIDTH = 1400;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > MAX_WIDTH) {
+        height = Math.round((height * MAX_WIDTH) / width);
+        width = MAX_WIDTH;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, width, height);
+
+      callback(canvas.toDataURL('image/webp', 0.84));
+    };
+  };
+}
+
+function renderThumbs() {
+  if (uploadedPhotos.length === 0) {
+    thumbsContainer.style.display = 'none';
+    slotsInfo.textContent = '3 huecos disponibles · Pulsa una foto para marcar portada';
+    return;
+  }
+
+  thumbsContainer.style.display = 'grid';
+  slotsInfo.textContent = `${3 - uploadedPhotos.length} huecos restantes · Haz clic en una foto para hacerla portada`;
+
+  thumbsContainer.innerHTML = uploadedPhotos.map((item, idx) => `
+    <div class="thumb-slot ${item.isPrimary ? 'is-primary' : ''}" onclick="setAsPrimary(${idx})">
+      <img src="${item.url}" alt="Miniatura ${idx + 1}">
+      <span class="badge-cover">${item.isPrimary ? '★ Portada' : 'Hacer portada'}</span>
+      <button type="button" class="btn-del" onclick="removePhoto(event, ${idx})" title="Eliminar">✕</button>
+    </div>
+  `).join('');
+}
+
+window.setAsPrimary = function(index) {
+  uploadedPhotos.forEach((p, idx) => p.isPrimary = (idx === index));
+  renderThumbs();
+};
+
+window.removePhoto = function(e, index) {
+  e.stopPropagation();
+  const wasPrimary = uploadedPhotos[index].isPrimary;
+  uploadedPhotos.splice(index, 1);
+  if (wasPrimary && uploadedPhotos.length > 0) {
+    uploadedPhotos[0].isPrimary = true;
+  }
+  renderThumbs();
+};
+
+function resetUploader() {
+  fileInput.value = '';
+  uploadedPhotos = [];
+  renderThumbs();
+}
+
+// Guardar nuevo evento
+$('#save').onclick = () => {
+  let title = $('#new-title').value.trim();
+  if (!title) {
+    alert('Introduce al menos un título para el evento.');
+    return;
+  }
+  let desc = $('#new-desc').value.trim() || 'Nuevo evento creado desde el panel de administración.';
+
+  const photosUrls = uploadedPhotos.map(p => p.url);
+  const primaryIndex = Math.max(0, uploadedPhotos.findIndex(p => p.isPrimary));
+
+  events.unshift([
+    title,
+    $('#new-cat').value,
+    'Úbeda',
+    'Próximamente',
+    '20 Sep',
+    '19:00',
+    $('#new-venue').value,
+    'Gratis',
+    desc,
+    photosUrls,
+    primaryIndex
+  ]);
+
+  $('#new-title').value = '';
+  resetUploader();
+  $('#toast').classList.add('on');
+  setTimeout(() => $('#toast').classList.remove('on'), 3000);
+  draw();
+};
+
+// Carga inicial
+draw();
+</script>
+</body>
+</html>

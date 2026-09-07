@@ -1,45 +1,106 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { 
-  getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp 
-} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
-import { 
-  getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+  db, auth, eventsRef, locationsRef, townsRef, usersRef,
+  addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
+  signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from "./firebase-config.js";
 
-const firebaseConfig = {
-  projectId: "ciudad-viva-1c19f",
-  appId: "1:490349125496:web:27a46fae03141901d9328d",
-  storageBucket: "ciudad-viva-1c19f.firebasestorage.app",
-  apiKey: "AIzaSyA5FYYnyohOrAFPdjMc_SDzqZfzjaIQxU0",
-  authDomain: "ciudad-viva-1c19f.firebaseapp.com",
-  messagingSenderId: "490349125496",
-  measurementId: "G-9D7RJLHN8P"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-
-const eventsRef = collection(db, "events");
-const locationsRef = collection(db, "locations");
-const townsRef = collection(db, "towns");
-const usersRef = collection(db, "users");
-
-let selectedCategory = '';
 let events = [];
 let locations = [];
 let towns = [];
 let usersList = [];
 let currentUserProfile = null;
 let uploadedPhotos = [];
-let activeGalleryPhotos = [];
-let currentLightboxIdx = 0;
-
-// Scroll Infinito
-let visibleCount = 6;
-let observer = null;
 
 const $ = s => document.querySelector(s);
+
+// ----------------------------------------------------
+// MODO OSCURO (Dark Mode) ADMIN
+// ----------------------------------------------------
+function initAdminTheme() {
+  const savedTheme = localStorage.getItem('ciudad_viva_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateAdminThemeToggleUI(savedTheme);
+}
+
+function updateAdminThemeToggleUI(theme) {
+  const btn = $('#admin-theme-toggle');
+  if (btn) {
+    btn.innerHTML = theme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+  }
+}
+
+function toggleAdminTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('ciudad_viva_theme', next);
+  updateAdminThemeToggleUI(next);
+}
+
+initAdminTheme();
+if ($('#admin-theme-toggle')) $('#admin-theme-toggle').onclick = toggleAdminTheme;
+
+// ----------------------------------------------------
+// NOTIFICACIONES Y DIÁLOGOS SWEETALERT2
+// ----------------------------------------------------
+const Toast = (typeof Swal !== 'undefined') ? Swal.mixin({
+  toast: true,
+  position: 'top-end',
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  didOpen: (toast) => {
+    toast.onmouseenter = Swal.stopTimer;
+    toast.onmouseleave = Swal.resumeTimer;
+  }
+}) : null;
+
+function notifySuccess(message) {
+  if (Toast) {
+    Toast.fire({ icon: 'success', title: message });
+  } else {
+    alert(message);
+  }
+}
+
+function notifyWarning(message) {
+  if (Toast) {
+    Toast.fire({ icon: 'warning', title: message });
+  } else {
+    alert(message);
+  }
+}
+
+function notifyError(title, message) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      icon: 'error',
+      title: title || 'Error',
+      text: message,
+      confirmButtonColor: '#0f6674'
+    });
+  } else {
+    alert(message);
+  }
+}
+
+async function confirmDialog(title, text, confirmText = 'Sí, eliminar') {
+  if (typeof Swal !== 'undefined') {
+    const res = await Swal.fire({
+      title: title,
+      text: text,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: confirmText,
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true
+    });
+    return res.isConfirmed;
+  }
+  return confirm(`${title}\n${text}`);
+}
 
 function isTownAllowed(townName) {
   if (!currentUserProfile) return true;
@@ -139,11 +200,11 @@ function updateUserRoleUI(resetToSummary = false) {
 
   renderTowns();
   renderLocations();
-  draw();
+  renderAdminEvents();
   updateSummaryStats();
 }
 
-// Formulario de Login tradicional (Email / Password)
+// Formulario de Login (Email / Password)
 const loginForm = $('#login-form');
 if (loginForm) {
   loginForm.onsubmit = async (e) => {
@@ -216,15 +277,7 @@ if (btnLogout) {
   };
 }
 
-// ----------------------------------------------------
-// NAVEGACIÓN Y PESTAÑAS
-// ----------------------------------------------------
-document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tab, .view').forEach(x => x.classList.remove('on'));
-  b.classList.add('on');
-  $('#' + b.dataset.view).classList.add('on');
-});
-
+// Navegación entre pestañas
 document.querySelectorAll('.admin-tab').forEach(btn => {
   btn.onclick = () => {
     switchToSubView(btn.dataset.adminSubview);
@@ -233,7 +286,6 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
 
 const freeCheckbox = $('#new-price-free');
 const priceWrap = $('#price-input-wrap');
-
 if (freeCheckbox && priceWrap) {
   freeCheckbox.onchange = () => {
     priceWrap.style.display = freeCheckbox.checked ? 'none' : 'flex';
@@ -271,14 +323,6 @@ async function loadTowns() {
 }
 
 function renderTowns() {
-  const citizenTownSelect = $('#town');
-  if (citizenTownSelect) {
-    const currentVal = citizenTownSelect.value;
-    citizenTownSelect.innerHTML = `<option value="">Todos los municipios</option>` + 
-      towns.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
-    if (currentVal) citizenTownSelect.value = currentVal;
-  }
-
   const venueTownSelect = $('#new-venue-town');
   if (venueTownSelect) {
     const currentVal = venueTownSelect.value;
@@ -299,14 +343,14 @@ function renderTowns() {
   }
 
   listEl.innerHTML = filteredTowns.map(t => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+    <div class="admin-list-item">
       <div>
-        <b style="font-size:15px; color:#0f172a;">${t.name}</b><br>
+        <b style="font-size:15px;">${t.name}</b><br>
         <span class="muted" style="font-size:13px;">${t.province || 'Jaén'}</span>
       </div>
       <div style="display:flex; gap:8px;">
-        <button class="btn-secondary" style="padding:6px 12px; font-size:13px;" onclick="editTown('${t.id}')">Editar</button>
-        <button class="btn-secondary" style="padding:6px 12px; font-size:13px; color:#dc2626; border-color:#fca5a5;" onclick="deleteTown('${t.id}')">Eliminar</button>
+        <button class="btn-action-edit" onclick="editTown('${t.id}')">✏️ Editar</button>
+        <button class="btn-action-delete" onclick="deleteTown('${t.id}')">🗑️ Eliminar</button>
       </div>
     </div>
   `).join('');
@@ -320,7 +364,7 @@ if ($('#save-town')) {
     const name = $('#new-town-name').value.trim();
     const province = $('#new-town-province').value.trim() || 'Jaén';
 
-    if (!name) return alert('Escribe el nombre del municipio.');
+    if (!name) return notifyWarning('Escribe el nombre del municipio.');
 
     try {
       $('#save-town').disabled = true;
@@ -328,20 +372,17 @@ if ($('#save-town')) {
 
       if (id) {
         await updateDoc(doc(db, "towns", id), { name, province });
+        notifySuccess('Municipio actualizado con éxito.');
       } else {
         await addDoc(townsRef, { name, province });
+        notifySuccess('Municipio creado con éxito.');
       }
 
       resetTownForm();
-      const toast = $('#toast-town');
-      if (toast) {
-        toast.style.display = 'inline-block';
-        setTimeout(() => toast.style.display = 'none', 3000);
-      }
       await loadTowns();
     } catch(err) {
       console.error(err);
-      alert("Error al guardar municipio: " + err.message);
+      notifyError('Error al guardar municipio', err.message);
     } finally {
       $('#save-town').disabled = false;
       $('#save-town').textContent = "Guardar municipio";
@@ -366,14 +407,16 @@ window.deleteTown = async (id) => {
   const t = towns.find(item => item.id === id);
   if (!t) return;
 
-  if (!confirm(`¿Seguro que quieres eliminar el municipio "${t.name}"?`)) return;
+  const confirmed = await confirmDialog('¿Eliminar municipio?', `¿Seguro que quieres eliminar el municipio "${t.name}"?`);
+  if (!confirmed) return;
 
   try {
     await deleteDoc(doc(db, "towns", id));
+    notifySuccess(`Municipio "${t.name}" eliminado con éxito.`);
     await loadTowns();
   } catch(err) {
     console.error(err);
-    alert("Error al eliminar municipio: " + err.message);
+    notifyError('Error al eliminar municipio', err.message);
   }
 };
 
@@ -390,7 +433,6 @@ function resetTownForm() {
   if ($('#cancel-town-edit')) $('#cancel-town-edit').style.display = 'none';
 }
 
-
 // ----------------------------------------------------
 // GESTIÓN DE LUGARES / LOCATIONS
 // ----------------------------------------------------
@@ -406,8 +448,6 @@ async function loadLocations() {
     updateSummaryStats();
   } catch (e) {
     console.error("Error al cargar lugares:", e);
-    const listEl = $('#venues-list');
-    if (listEl) listEl.innerHTML = `<p style="color:red;">Asegúrate de haber activado Cloud Firestore en la consola de Firebase.</p>`;
   }
 }
 
@@ -445,17 +485,24 @@ function renderLocations() {
   listEl.innerHTML = filteredLocations.map(loc => {
     const hasMaps = !!loc.mapsUrl;
     const disp = getLocationDisplayName(loc);
+    const metaParts = [];
+    if (loc.address) metaParts.push(`📍 ${loc.address}`);
+    if (loc.capacity) metaParts.push(`👥 Aforo: ${loc.capacity}`);
+    if (loc.phone) metaParts.push(`📞 ${loc.phone}`);
+    const metaText = metaParts.length > 0 ? `<br><span class="muted" style="font-size:12px;">${metaParts.join(' · ')}</span>` : '';
+
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+      <div class="admin-list-item">
         <div>
-          <b style="font-size:15px; color:#0f172a;">${disp}</b><br>
+          <b style="font-size:15px;">${disp}</b>
+          ${metaText}<br>
           ${hasMaps 
             ? `<a href="${loc.mapsUrl}" target="_blank" style="color:#2563eb; font-size:13px; text-decoration:underline;">Ver en Google Maps ↗</a>` 
             : `<span class="muted" style="font-size:13px;">Sin enlace a Maps</span>`}
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn-secondary" style="padding:6px 12px; font-size:13px;" onclick="editVenue('${loc.id}')">Editar</button>
-          <button class="btn-secondary" style="padding:6px 12px; font-size:13px; color:#dc2626; border-color:#fca5a5;" onclick="deleteVenue('${loc.id}')">Eliminar</button>
+          <button class="btn-action-edit" onclick="editVenue('${loc.id}')">✏️ Editar</button>
+          <button class="btn-action-delete" onclick="deleteVenue('${loc.id}')">🗑️ Eliminar</button>
         </div>
       </div>
     `;
@@ -468,32 +515,31 @@ if ($('#save-venue')) {
     let name = $('#new-venue-name').value.trim();
     const town = $('#new-venue-town') ? $('#new-venue-town').value : 'Úbeda';
     const mapsUrl = $('#new-venue-maps').value.trim();
+    const address = $('#new-venue-address') ? $('#new-venue-address').value.trim() : '';
+    const capacity = $('#new-venue-capacity') ? $('#new-venue-capacity').value.trim() : '';
+    const phone = $('#new-venue-phone') ? $('#new-venue-phone').value.trim() : '';
 
-    if (!name) return alert('Escribe el nombre del lugar.');
-
-    name = name.replace(/\s*\([^)]*\)$/, '').trim();
-    const locationPayload = { name, town, mapsUrl };
+    if (!name) return notifyWarning('Escribe el nombre del lugar.');
 
     try {
       $('#save-venue').disabled = true;
       $('#save-venue').textContent = "Guardando...";
 
+      const venuePayload = { name, town, mapsUrl, address, capacity, phone };
+
       if (id) {
-        await updateDoc(doc(db, "locations", id), locationPayload);
+        await updateDoc(doc(db, "locations", id), venuePayload);
+        notifySuccess('Lugar actualizado con éxito.');
       } else {
-        await addDoc(locationsRef, locationPayload);
+        await addDoc(locationsRef, venuePayload);
+        notifySuccess('Lugar creado con éxito.');
       }
 
       resetVenueForm();
-      const toast = $('#toast-venue');
-      if (toast) {
-        toast.style.display = 'inline-block';
-        setTimeout(() => toast.style.display = 'none', 3000);
-      }
       await loadLocations();
     } catch(err) {
       console.error(err);
-      alert("Error al guardar lugar: " + err.message);
+      notifyError('Error al guardar lugar', err.message);
     } finally {
       $('#save-venue').disabled = false;
       $('#save-venue').textContent = "Guardar lugar";
@@ -506,11 +552,13 @@ window.editVenue = (id) => {
   if (!loc) return;
 
   $('#venue-edit-id').value = loc.id;
-  const rawName = loc.name.replace(/\s*\([^)]*\)$/, '').trim();
-  $('#new-venue-name').value = rawName;
-  if ($('#new-venue-town') && loc.town) $('#new-venue-town').value = loc.town;
+  $('#new-venue-name').value = loc.name;
+  if ($('#new-venue-town')) $('#new-venue-town').value = loc.town || 'Úbeda';
   $('#new-venue-maps').value = loc.mapsUrl || '';
-  
+  if ($('#new-venue-address')) $('#new-venue-address').value = loc.address || '';
+  if ($('#new-venue-capacity')) $('#new-venue-capacity').value = loc.capacity || '';
+  if ($('#new-venue-phone')) $('#new-venue-phone').value = loc.phone || '';
+
   $('#venue-form-title').textContent = "Editar Lugar";
   $('#save-venue').textContent = "Actualizar lugar";
   if ($('#cancel-venue-edit')) $('#cancel-venue-edit').style.display = 'inline-block';
@@ -520,14 +568,16 @@ window.deleteVenue = async (id) => {
   const loc = locations.find(item => item.id === id);
   if (!loc) return;
 
-  if (!confirm(`¿Seguro que quieres eliminar el lugar "${getLocationDisplayName(loc)}"?`)) return;
+  const confirmed = await confirmDialog('¿Eliminar lugar?', `¿Seguro que quieres eliminar el lugar "${getLocationDisplayName(loc)}"?`);
+  if (!confirmed) return;
 
   try {
     await deleteDoc(doc(db, "locations", id));
+    notifySuccess(`Lugar "${getLocationDisplayName(loc)}" eliminado con éxito.`);
     await loadLocations();
   } catch(err) {
     console.error(err);
-    alert("Error al eliminar el lugar: " + err.message);
+    notifyError('Error al eliminar lugar', err.message);
   }
 };
 
@@ -539,261 +589,140 @@ function resetVenueForm() {
   $('#venue-edit-id').value = '';
   $('#new-venue-name').value = '';
   $('#new-venue-maps').value = '';
+  if ($('#new-venue-address')) $('#new-venue-address').value = '';
+  if ($('#new-venue-capacity')) $('#new-venue-capacity').value = '';
+  if ($('#new-venue-phone')) $('#new-venue-phone').value = '';
   $('#venue-form-title').textContent = "Añadir Nuevo Lugar";
   $('#save-venue').textContent = "Guardar lugar";
   if ($('#cancel-venue-edit')) $('#cancel-venue-edit').style.display = 'none';
 }
 
-
 // ----------------------------------------------------
-// GESTIÓN DE EVENTOS & SCROLL INFINITO
+// GESTIÓN DE EVENTOS
 // ----------------------------------------------------
 async function loadEvents() {
   try {
-    const q = query(eventsRef, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(eventsRef);
     events = [];
     snapshot.forEach(docSnap => {
       events.push({ id: docSnap.id, ...docSnap.data() });
     });
-
-    if (events.length < 5) {
-      await seedDatabase(true);
-    } else {
-      draw();
-      updateSummaryStats();
-    }
+    renderAdminEvents();
+    updateSummaryStats();
   } catch (e) {
     console.error("Error al cargar eventos:", e);
-    draw();
   }
 }
 
-async function seedDatabase(force = false) {
-  try {
-    const btn = $('#btn-seed-data');
-    if (btn) { btn.disabled = true; btn.textContent = "⏳ Generando 30 Eventos y 20 Lugares..."; }
+function renderAdminEvents() {
+  const adminEventsList = $('#admin-events-list');
+  if (!adminEventsList) return;
 
-    if (force) {
-      const evSnap = await getDocs(eventsRef);
-      for (const d of evSnap.docs) { await deleteDoc(doc(db, "events", d.id)); }
-      
-      const locSnap = await getDocs(locationsRef);
-      for (const d of locSnap.docs) { await deleteDoc(doc(db, "locations", d.id)); }
-    }
-
-    const dummyLocations = [
-      { name: 'Hospital de Santiago', town: 'Úbeda', mapsUrl: 'https://maps.app.goo.gl/6QN1Jj5r28aWBtUL7' },
-      { name: 'Plaza Vázquez de Molina', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Teatro Ideal Cinema', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Palacio Vela de los Cobos', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Sinagoga del Agua', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Parque de la Alameda', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Museo Arqueológico de Úbeda', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Plaza Primero de Mayo', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Alfarería Paco Tito', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Centro del Olivar y Aceite', town: 'Úbeda', mapsUrl: '' },
-      { name: 'Auditorio Ruinas de San Francisco', town: 'Baeza', mapsUrl: '' },
-      { name: 'Catedral de Santa María', town: 'Baeza', mapsUrl: '' },
-      { name: 'Palacio de Jabalquinto', town: 'Baeza', mapsUrl: '' },
-      { name: 'Antigua Universidad de Baeza', town: 'Baeza', mapsUrl: '' },
-      { name: 'Plaza del Pópulo', town: 'Baeza', mapsUrl: '' },
-      { name: 'Paseo Antonio Machado', town: 'Baeza', mapsUrl: '' },
-      { name: 'Polideportivo Municipal', town: 'Baeza', mapsUrl: '' },
-      { name: 'Teatro Montemar', town: 'Baeza', mapsUrl: '' },
-      { name: 'Plaza de Santa María', town: 'Baeza', mapsUrl: '' },
-      { name: 'Plaza de los Leones', town: 'Baeza', mapsUrl: '' }
-    ];
-
-    for (const loc of dummyLocations) {
-      await addDoc(locationsRef, loc);
-    }
-
-    const cats = ['Música', 'Patrimonio', 'Gastronomía', 'Talleres', 'Cine', 'Deporte'];
-    const dummyEvents = [];
-
-    for (let i = 1; i <= 30; i++) {
-      const isUbeda = i % 2 === 0;
-      const townName = isUbeda ? 'Úbeda' : 'Baeza';
-      const locList = dummyLocations.filter(l => l.town === townName);
-      const locObj = locList[i % locList.length];
-      const category = cats[i % cats.length];
-      const isFree = i % 3 === 0;
-      const price = isFree ? 'Gratis' : `${(5 + (i * 2.5)).toFixed(2)} €`;
-
-      const day = (10 + (i % 20)).toString().padStart(2, '0');
-      const dateRaw = `2026-09-${day}`;
-      const dateLabel = `${day} Sep`;
-      const time = `${18 + (i % 5)}:30`;
-
-      let title = '';
-      if (category === 'Música') title = `Concierto ${i}: Noche de Clásicos y Jazz`;
-      else if (category === 'Patrimonio') title = `Ruta Guiada ${i}: Secretos e Historias`;
-      else if (category === 'Gastronomía') title = `Cata y Maridaje ${i}: Sabores del Renacimiento`;
-      else if (category === 'Talleres') title = `Taller Práctico ${i}: Cerámica y Artesanía`;
-      else if (category === 'Cine') title = `Cine Bajo las Estrellas V.${i}`;
-      else title = `Competición Deportiva ${i}: Torneo Abierto`;
-
-      dummyEvents.push({
-        title,
-        category,
-        town: townName,
-        dateRaw,
-        dateLabel,
-        time,
-        venue: `${locObj.name} (${townName})`,
-        price,
-        description: `Evento cultural número ${i} programado en ${locObj.name} (${townName}). Disfruta de la mejor oferta cultural de la comarca.`,
-        photos: [],
-        primaryPhotoIdx: 0,
-        linkFacebook: 'https://facebook.com',
-        linkWeb: '',
-        createdAt: serverTimestamp()
-      });
-    }
-
-    for (const ev of dummyEvents) {
-      await addDoc(eventsRef, ev);
-    }
-
-    if (btn) { btn.disabled = false; btn.textContent = "⚡ Cargar 30 Eventos y 20 Lugares de prueba"; }
-
-    await Promise.all([loadTowns(), loadLocations(), loadEvents()]);
-    alert("¡Éxito! Se han creado 20 Ubicaciones y 30 Eventos de prueba.");
-  } catch (err) {
-    console.error("Error al sembrar datos:", err);
-    alert("Error al cargar datos dummy: " + err.message);
-  }
-}
-
-if ($('#btn-seed-data')) {
-  $('#btn-seed-data').onclick = () => seedDatabase(true);
-}
-
-document.querySelectorAll('.chip-item').forEach(chip => {
-  chip.onclick = () => {
-    document.querySelectorAll('.chip-item').forEach(c => c.classList.remove('on'));
-    chip.classList.add('on');
-    selectedCategory = chip.dataset.cat;
-    visibleCount = 6;
-    draw();
-  };
-});
-
-function formatDateLabel(dateStr) {
-  if (!dateStr) return 'Próximamente';
-  const d = new Date(dateStr + 'T00:00:00');
-  if (isNaN(d)) return dateStr;
-
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${d.getDate()} ${months[d.getMonth()]}`;
-}
-
-function draw() {
-  let q = $('#search').value.toLowerCase();
-  let t = $('#town').value;
-  let d = $('#date').value;
-
-  let shown = events.filter(e => 
-    e.title.toLowerCase().includes(q) &&
-    (!selectedCategory || e.category === selectedCategory) &&
-    (!t || e.town === t) &&
-    (!d || (e.dateLabel && e.dateLabel.includes(d)))
+  const adminSearchQuery = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
+  const adminFilteredEvents = events.filter(e => 
+    isTownAllowed(e.town) &&
+    (e.title.toLowerCase().includes(adminSearchQuery) ||
+     e.category.toLowerCase().includes(adminSearchQuery) ||
+     (e.venue && e.venue.toLowerCase().includes(adminSearchQuery)))
   );
 
-  $('#count').textContent = shown.length + ' actividades';
-
-  const pageItems = shown.slice(0, visibleCount);
-
-  // Renderizar tarjetas en Vista Ciudadana
-  $('#cards').innerHTML = pageItems.map((e) => {
-    const photos = e.photos || [];
-    const primaryIndex = e.primaryPhotoIdx || 0;
-    const coverUrl = photos[primaryIndex] || photos[0];
-    const hasImg = !!coverUrl;
-    const bgStyle = hasImg ? `background-image:url('${coverUrl}');` : 'background:#e2e8f0;';
-    const galleryBadge = photos.length > 1 ? `<span class="badge-gallery">${photos.length} fotos</span>` : '';
-    const isFree = (e.price || '').toLowerCase().includes('gratis');
-
-    return `
-      <article class="card">
-        <div class="visual" style="${bgStyle}">
-          <span class="pill-time">${e.dateLabel || e.date || 'Próximamente'} · ${e.time || ''}</span>
-          ${galleryBadge}
-          <span>${e.town}</span>
+  if (adminFilteredEvents.length === 0) {
+    adminEventsList.innerHTML = `<p class="muted">${adminSearchQuery ? 'No hay eventos que coincidan con la búsqueda.' : 'No hay eventos en tus municipios asignados.'}</p>`;
+  } else {
+    adminEventsList.innerHTML = adminFilteredEvents.map(e => `
+      <div class="admin-list-item">
+        <div>
+          <b style="font-size:15px;">${e.title}</b><br>
+          <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${e.dateLabel || e.time})</span>
         </div>
-        <div class="card-body">
-          <div class="card-meta">
-            <span class="tag-category">${e.category}</span>
-            <span class="price-tag ${isFree ? '' : 'paid'}">${e.price}</span>
-          </div>
-          <h4>${e.title}</h4>
-          <p class="venue">🗺️ ${e.venue}</p>
-          <div class="card-footer">
-            <span class="muted">${e.dateLabel || 'Próximamente'}</span>
-            <button class="btn-detail" onclick="openDetail('${e.id}')">Ver ficha →</button>
-          </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-action-edit" onclick="editEvent('${e.id}')">✏️ Editar</button>
+          <button class="btn-action-delete" onclick="deleteEvent('${e.id}')">🗑️ Eliminar</button>
         </div>
-      </article>
-    `;
-  }).join('');
-
-  const sentinelText = $('#sentinel-text');
-  if (sentinelText) {
-    if (visibleCount >= shown.length) {
-      sentinelText.textContent = shown.length > 0 ? "✓ Has llegado al final de la agenda." : "No hay actividades disponibles.";
-    } else {
-      sentinelText.textContent = `Mostrando ${visibleCount} de ${shown.length} eventos (Desplaza para cargar más...)`;
-    }
-  }
-
-  setupScrollObserver(shown.length);
-
-  const adminEventsList = $('#admin-events-list');
-  if (adminEventsList) {
-    const adminSearchQuery = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
-    const adminFilteredEvents = events.filter(e => 
-      isTownAllowed(e.town) &&
-      (e.title.toLowerCase().includes(adminSearchQuery) ||
-       e.category.toLowerCase().includes(adminSearchQuery) ||
-       (e.venue && e.venue.toLowerCase().includes(adminSearchQuery)))
-    );
-
-    if (adminFilteredEvents.length === 0) {
-      adminEventsList.innerHTML = `<p class="muted">${adminSearchQuery ? 'No hay eventos que coincidan con la búsqueda.' : 'No hay eventos en tus municipios asignados.'}</p>`;
-    } else {
-      adminEventsList.innerHTML = adminFilteredEvents.map(e => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
-          <div>
-            <b style="font-size:15px; color:#0f172a;">${e.title}</b><br>
-            <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${e.dateLabel || e.time})</span>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn-secondary" style="padding:6px 12px; font-size:13px;" onclick="editEvent('${e.id}')">Editar</button>
-            <button class="btn-secondary" style="padding:6px 12px; font-size:13px; color:#dc2626; border-color:#fca5a5;" onclick="deleteEvent('${e.id}')">Eliminar</button>
-          </div>
-        </div>
-      `).join('');
-    }
+      </div>
+    `).join('');
   }
 }
 
-function setupScrollObserver(totalShown) {
-  const sentinel = $('#scroll-sentinel');
-  if (!sentinel) return;
+if ($('#btn-export-pdf')) {
+  $('#btn-export-pdf').onclick = () => exportAgendaPDF();
+}
 
-  if (observer) observer.disconnect();
+function exportAgendaPDF() {
+  const scopedEvents = events.filter(e => isTownAllowed(e.town));
+  if (scopedEvents.length === 0) {
+    return notifyWarning('No hay eventos disponibles para exportar.');
+  }
 
-  observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) {
-      if (visibleCount < totalShown) {
-        visibleCount += 6;
-        draw();
-      }
-    }
-  }, { rootMargin: '100px' });
+  const container = document.createElement('div');
+  container.style.padding = '24px';
+  container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+  container.style.color = '#0f172a';
+  container.style.background = '#ffffff';
 
-  observer.observe(sentinel);
+  const dateStr = new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  let html = `
+    <div style="border-bottom: 2px solid #2563eb; padding-bottom: 14px; margin-bottom: 20px; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h1 style="margin:0; font-size:24px; color:#2563eb; font-weight:800;">Ciudad Viva</h1>
+        <p style="margin:3px 0 0; color:#64748b; font-size:13px;">Boletín Oficial de Agenda Cultural y Planes de Ocio</p>
+      </div>
+      <div style="text-align:right; font-size:12px; color:#64748b;">
+        <b>Emisión:</b> ${dateStr}<br>
+        <b>Actividades:</b> ${scopedEvents.length}
+      </div>
+    </div>
+
+    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:#f1f5f9; text-align:left; color:#475569;">
+          <th style="padding:8px 10px; border-bottom:2px solid #cbd5e1;">Fecha / Hora</th>
+          <th style="padding:8px 10px; border-bottom:2px solid #cbd5e1;">Evento</th>
+          <th style="padding:8px 10px; border-bottom:2px solid #cbd5e1;">Categoría</th>
+          <th style="padding:8px 10px; border-bottom:2px solid #cbd5e1;">Lugar / Municipio</th>
+          <th style="padding:8px 10px; border-bottom:2px solid #cbd5e1;">Entrada</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  scopedEvents.forEach(e => {
+    html += `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${e.dateLabel || 'Próximamente'}<br><span style="font-weight:normal; font-size:11px; color:#64748b;">${e.time || '20:00'}</span></td>
+        <td style="padding:8px 10px;"><b style="font-size:13px; color:#0f172a;">${e.title}</b><br><span style="color:#475569; font-size:11px;">${(e.description || '').slice(0, 90)}${(e.description || '').length > 90 ? '...' : ''}</span></td>
+        <td style="padding:8px 10px; font-weight:600; color:#2563eb;">${e.category}</td>
+        <td style="padding:8px 10px;">${e.venue}<br><span style="font-weight:600; color:#64748b; font-size:11px;">${e.town}</span></td>
+        <td style="padding:8px 10px; font-weight:700; color:#047857;">${e.price}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+      </tbody>
+    </table>
+    <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; color: #94a3b8; font-size: 10px;">
+      Ciudad Viva © Plataforma de Agenda Cultural Municipal · Documento generado automáticamente.
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  const opt = {
+    margin: 8,
+    filename: `Agenda_Cultural_CiudadViva_${new Date().toISOString().slice(0,10)}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  if (typeof html2pdf !== 'undefined') {
+    notifySuccess('Generando documento PDF de la agenda...');
+    html2pdf().set(opt).from(container).save();
+  } else {
+    notifyError('Error', 'La librería de exportación a PDF no se ha cargado correctamente.');
+  }
 }
 
 function updateSummaryStats() {
@@ -812,7 +741,7 @@ function updateSummaryStats() {
       recEventsEl.innerHTML = `<p class="muted">No hay eventos recientes.</p>`;
     } else {
       recEventsEl.innerHTML = scopedEvents.slice(0, 5).map(e => `
-        <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+        <div class="admin-list-item-simple">
           <b>${e.title}</b><br>
           <span class="muted" style="font-size:12px;">${e.category} · ${e.venue}</span>
         </div>
@@ -826,7 +755,7 @@ function updateSummaryStats() {
       recVenuesEl.innerHTML = `<p class="muted">No hay lugares recientes.</p>`;
     } else {
       recVenuesEl.innerHTML = scopedLocations.slice(0, 5).map(v => `
-        <div style="padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+        <div class="admin-list-item-simple">
           <b>${getLocationDisplayName(v)}</b>
         </div>
       `).join('');
@@ -834,16 +763,7 @@ function updateSummaryStats() {
   }
 }
 
-['search', 'town', 'date'].forEach(id => {
-  if ($('#' + id)) {
-    $('#' + id).oninput = () => {
-      visibleCount = 6;
-      draw();
-    };
-  }
-});
-
-if ($('#admin-search-events')) $('#admin-search-events').oninput = draw;
+if ($('#admin-search-events')) $('#admin-search-events').oninput = renderAdminEvents;
 if ($('#admin-search-venues')) $('#admin-search-venues').oninput = renderLocations;
 
 if ($('#btn-new-event')) {
@@ -851,6 +771,15 @@ if ($('#btn-new-event')) {
     resetEventForm();
     $('#event-form-panel').scrollIntoView({ behavior: 'smooth' });
   };
+}
+
+function formatDateLabel(dateStr) {
+  if (!dateStr) return 'Próximamente';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+
+  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
 window.editEvent = (id) => {
@@ -893,14 +822,16 @@ window.deleteEvent = async (id) => {
   const e = events.find(item => item.id === id);
   if (!e) return;
 
-  if (!confirm(`¿Seguro que quieres eliminar el evento "${e.title}"?`)) return;
+  const confirmed = await confirmDialog('¿Eliminar evento?', `¿Seguro que quieres eliminar el evento "${e.title}"?`);
+  if (!confirmed) return;
 
   try {
     await deleteDoc(doc(db, "events", id));
+    notifySuccess(`Evento "${e.title}" eliminado con éxito.`);
     await loadEvents();
   } catch(err) {
     console.error(err);
-    alert("Error al eliminar el evento: " + err.message);
+    notifyError('Error al eliminar el evento', err.message);
   }
 };
 
@@ -934,7 +865,7 @@ if ($('#save')) {
   $('#save').onclick = async () => {
     const id = $('#event-edit-id').value;
     let title = $('#new-title').value.trim();
-    if (!title) return alert('Escribe un título.');
+    if (!title) return notifyWarning('Escribe un título para el evento.');
 
     const isFree = $('#new-price-free').checked;
     const priceVal = parseFloat($('#new-price-num').value);
@@ -972,23 +903,18 @@ if ($('#save')) {
 
       if (id) {
         await updateDoc(doc(db, "events", id), eventPayload);
+        notifySuccess('Evento actualizado con éxito.');
       } else {
         eventPayload.createdAt = serverTimestamp();
         await addDoc(eventsRef, eventPayload);
+        notifySuccess('Evento publicado en la agenda.');
       }
 
       resetEventForm();
-      
-      const toast = $('#toast');
-      if (toast) {
-        toast.style.display = 'inline-block';
-        setTimeout(() => toast.style.display = 'none', 3000);
-      }
-      
       loadEvents();
     } catch(err) {
       console.error(err);
-      alert("Error al guardar el evento: " + err.message);
+      notifyError('Error al guardar el evento', err.message);
     } finally {
       $('#save').disabled = false;
       $('#save').textContent = id ? "Actualizar evento" : "Publicar en la agenda";
@@ -996,117 +922,9 @@ if ($('#save')) {
   };
 }
 
-window.openDetail = function(id) {
-  let e = events.find(ev => ev.id === id);
-  if(!e) return;
-
-  $('#dtag').textContent = e.category;
-  $('#dtitle').textContent = e.title;
-  $('#ddesc').textContent = e.description;
-  $('#dwhen').textContent = (e.dateLabel || 'Próximamente') + ', ' + e.time;
-  
-  const locObj = locations.find(loc => getLocationDisplayName(loc) === e.venue || loc.name === e.venue);
-  
-  if (locObj && locObj.mapsUrl) {
-    $('#dwhere').innerHTML = `<a href="${locObj.mapsUrl}" target="_blank" style="color:#2563eb; text-decoration:underline;">${e.venue} ↗</a>`;
-  } else {
-    $('#dwhere').textContent = e.venue;
-  }
-  
-  $('#dprice').textContent = e.price;
-
-  const linksEl = $('#modal-links');
-  if (linksEl) {
-    let linksHtml = '';
-    if (e.linkFacebook) {
-      linksHtml += `<a href="${e.linkFacebook}" target="_blank" style="color:#1877f2; font-weight:600; text-decoration:underline; font-size:14px;">📘 Ver publicación en Facebook ↗</a>`;
-    }
-    if (e.linkWeb) {
-      linksHtml += `<a href="${e.linkWeb}" target="_blank" style="color:#2563eb; font-weight:600; text-decoration:underline; font-size:14px;">🌐 Web Oficial / Venta de Entradas ↗</a>`;
-    }
-    linksEl.innerHTML = linksHtml;
-  }
-
-  const galleryEl = $('#modal-gallery');
-  const photos = e.photos || [];
-  const primaryIdx = e.primaryPhotoIdx || 0;
-
-  if (photos.length > 0) {
-    const sorted = [...photos];
-    if (primaryIdx > 0 && primaryIdx < sorted.length) {
-      const p = sorted.splice(primaryIdx, 1)[0];
-      sorted.unshift(p);
-    }
-    activeGalleryPhotos = sorted;
-
-    galleryEl.style.display = 'grid';
-    galleryEl.className = `modal-gallery count-${sorted.length}`;
-
-    if (sorted.length === 1) {
-      galleryEl.innerHTML = `<img src="${sorted[0]}" class="main-photo" alt="Cartel" onclick="openLightbox(0)">`;
-    } else if (sorted.length === 2) {
-      galleryEl.innerHTML = `
-        <img src="${sorted[0]}" class="main-photo" alt="Foto 1" onclick="openLightbox(0)">
-        <img src="${sorted[1]}" class="sub-photo" alt="Foto 2" onclick="openLightbox(1)">
-      `;
-    } else {
-      galleryEl.innerHTML = `
-        <img src="${sorted[0]}" class="main-photo" alt="Foto 1" onclick="openLightbox(0)">
-        <img src="${sorted[1]}" class="sub-photo" alt="Foto 2" onclick="openLightbox(1)">
-        <img src="${sorted[2]}" class="sub-photo" alt="Foto 3" onclick="openLightbox(2)">
-      `;
-    }
-  } else {
-    activeGalleryPhotos = [];
-    galleryEl.style.display = 'none';
-  }
-
-  $('#detail').classList.add('on');
-};
-
-window.closeDetail = () => $('#detail').classList.remove('on');
-
-// Lightbox
-window.openLightbox = (index) => {
-  if (!activeGalleryPhotos.length) return;
-  currentLightboxIdx = index;
-  updateLightbox();
-  $('#lightbox').classList.add('on');
-};
-
-window.closeLightbox = () => $('#lightbox').classList.remove('on');
-
-function updateLightbox() {
-  $('#lb-img').src = activeGalleryPhotos[currentLightboxIdx];
-  $('#lb-counter').textContent = `${currentLightboxIdx + 1} / ${activeGalleryPhotos.length}`;
-  const showNav = activeGalleryPhotos.length > 1;
-  $('.lb-prev').style.display = showNav ? 'flex' : 'none';
-  $('.lb-next').style.display = showNav ? 'flex' : 'none';
-}
-
-window.prevLightboxPhoto = () => {
-  currentLightboxIdx = (currentLightboxIdx - 1 + activeGalleryPhotos.length) % activeGalleryPhotos.length;
-  updateLightbox();
-};
-
-window.nextLightboxPhoto = () => {
-  currentLightboxIdx = (currentLightboxIdx + 1) % activeGalleryPhotos.length;
-  updateLightbox();
-};
-
-window.addEventListener('keydown', (e) => {
-  if ($('#lightbox').classList.contains('on')) {
-    if (e.key === 'Escape') closeLightbox();
-    if (e.key === 'ArrowLeft') prevLightboxPhoto();
-    if (e.key === 'ArrowRight') nextLightboxPhoto();
-  } else if ($('#detail').classList.contains('on')) {
-    if (e.key === 'Escape') closeDetail();
-  }
-});
-
-$('#lightbox').onclick = (e) => { if (e.target === $('#lightbox')) closeLightbox(); };
-$('#detail').onclick = e => { if (e.target === $('#detail')) closeDetail(); };
-
+// ----------------------------------------------------
+// SUBIDA DE FOTOS Y COMPRESIÓN EN CANVAS
+// ----------------------------------------------------
 const dropZone = $('#drop-zone');
 const fileInput = $('#poster-input');
 const thumbsContainer = $('#thumbs-container');
@@ -1123,7 +941,7 @@ if (dropZone) {
 function handleFiles(fileList) {
   const files = Array.from(fileList);
   const remaining = 3 - uploadedPhotos.length;
-  if (remaining <= 0) return alert('Máximo 3 imágenes.');
+  if (remaining <= 0) return notifyWarning('Máximo 3 imágenes por evento.');
 
   files.slice(0, remaining).forEach(file => {
     if (!file.type.startsWith('image/')) return;
@@ -1154,19 +972,21 @@ function handleFiles(fileList) {
 
 function renderThumbs() {
   if (!uploadedPhotos.length) {
-    thumbsContainer.style.display = 'none';
-    slotsInfo.textContent = '3 huecos disponibles';
+    if (thumbsContainer) thumbsContainer.style.display = 'none';
+    if (slotsInfo) slotsInfo.textContent = '3 huecos disponibles';
     return;
   }
-  thumbsContainer.style.display = 'grid';
-  slotsInfo.textContent = `${3 - uploadedPhotos.length} huecos restantes · Clic para portada`;
-  thumbsContainer.innerHTML = uploadedPhotos.map((item, idx) => `
-    <div class="thumb-slot ${item.isPrimary ? 'is-primary' : ''}" onclick="setAsPrimary(${idx})">
-      <img src="${item.url}">
-      <span class="badge-cover">${item.isPrimary ? '★ Portada' : 'Hacer portada'}</span>
-      <button type="button" class="btn-del" onclick="removePhoto(event, ${idx})">✕</button>
-    </div>
-  `).join('');
+  if (thumbsContainer) thumbsContainer.style.display = 'grid';
+  if (slotsInfo) slotsInfo.textContent = `${3 - uploadedPhotos.length} huecos restantes · Clic para portada`;
+  if (thumbsContainer) {
+    thumbsContainer.innerHTML = uploadedPhotos.map((item, idx) => `
+      <div class="thumb-slot ${item.isPrimary ? 'is-primary' : ''}" onclick="setAsPrimary(${idx})">
+        <img src="${item.url}">
+        <span class="badge-cover">${item.isPrimary ? '★ Portada' : 'Hacer portada'}</span>
+        <button type="button" class="btn-del" onclick="removePhoto(event, ${idx})">✕</button>
+      </div>
+    `).join('');
+  }
 }
 
 window.setAsPrimary = (idx) => {
@@ -1220,13 +1040,13 @@ function renderUsers() {
       : `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Gestor Municipal</span>`;
 
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0;">
+      <div class="admin-list-item">
         <div>
-          <b style="font-size:15px; color:#0f172a;">${u.email || 'Sin email'}</b> ${roleBadge}<br>
+          <b style="font-size:15px;">${u.email || 'Sin email'}</b> ${roleBadge}<br>
           <span class="muted" style="font-size:13px;">Municipios autorizados: <b>${townsLabel}</b></span>
         </div>
         <div style="display:flex; gap:8px;">
-          <button class="btn-secondary" style="padding:6px 12px; font-size:13px;" onclick="editUserPermissions('${u.id}')">Editar Permisos</button>
+          <button class="btn-action-edit" onclick="editUserPermissions('${u.id}')">⚙️ Editar Permisos</button>
         </div>
       </div>
     `;
@@ -1285,7 +1105,7 @@ if ($('#user-edit-role')) {
 if ($('#save-user-permissions')) {
   $('#save-user-permissions').onclick = async () => {
     const uid = $('#user-edit-uid').value;
-    if (!uid) return alert('Selecciona un usuario de la lista para editar sus permisos.');
+    if (!uid) return notifyWarning('Selecciona un usuario de la lista para editar sus permisos.');
 
     const role = $('#user-edit-role').value;
     let allowedTowns = [];
@@ -1296,7 +1116,7 @@ if ($('#save-user-permissions')) {
       const checkboxes = document.querySelectorAll('.user-town-cb:checked');
       allowedTowns = Array.from(checkboxes).map(cb => cb.value);
       if (allowedTowns.length === 0) {
-        return alert('Debes seleccionar al menos un municipio para este gestor municipal.');
+        return notifyWarning('Debes seleccionar al menos un municipio para este gestor municipal.');
       }
     }
 
@@ -1309,11 +1129,7 @@ if ($('#save-user-permissions')) {
         allowedTowns: allowedTowns
       });
 
-      const toast = $('#toast-user');
-      if (toast) {
-        toast.style.display = 'inline-block';
-        setTimeout(() => toast.style.display = 'none', 3000);
-      }
+      notifySuccess('Permisos de usuario actualizados con éxito.');
 
       if (currentUserProfile && (currentUserProfile.uid === uid || currentUserProfile.id === uid)) {
         currentUserProfile.role = role;
@@ -1324,7 +1140,7 @@ if ($('#save-user-permissions')) {
       await loadUsers();
     } catch (e) {
       console.error("Error al actualizar permisos:", e);
-      alert("Error al actualizar permisos: " + e.message);
+      notifyError('Error al actualizar permisos', e.message);
     } finally {
       $('#save-user-permissions').disabled = false;
       $('#save-user-permissions').textContent = "Guardar Permisos";
@@ -1342,5 +1158,253 @@ if ($('#cancel-user-edit')) {
   };
 }
 
-// Carga Inicial
+// ----------------------------------------------------
+// DETALLE, LIGHTBOX Y COMPARTE DESDE ADMIN
+// ----------------------------------------------------
+let activeGalleryPhotos = [];
+let currentLightboxIdx = 0;
+
+function parseEventDates(e) {
+  const dateStr = e.dateRaw || new Date().toISOString().split('T')[0];
+  const timeStr = e.time || '20:00';
+  const parts = dateStr.split('-').map(Number);
+  const year = parts[0] || 2026, month = parts[1] || 9, day = parts[2] || 15;
+  const timeParts = (timeStr.includes(':') ? timeStr.split(':') : [20, 0]).map(Number);
+  const hours = timeParts[0] || 20, minutes = timeParts[1] || 0;
+
+  const startDate = new Date(year, month - 1, day, hours, minutes);
+  const endDate = new Date(startDate.getTime() + (2 * 60 * 60 * 1000));
+
+  const formatICS = (d) => {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  };
+
+  return { startICS: formatICS(startDate), endICS: formatICS(endDate) };
+}
+
+function generateGoogleCalendarUrl(e) {
+  const { startICS, endICS } = parseEventDates(e);
+  const title = encodeURIComponent(e.title || 'Evento Ciudad Viva');
+  const details = encodeURIComponent(`${e.description || ''}\n\nCategoría: ${e.category || ''}\nEntrada: ${e.price || ''}`);
+  const location = encodeURIComponent(e.venue || e.town || '');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startICS}/${endICS}&details=${details}&location=${location}`;
+}
+
+function downloadIcsFile(e) {
+  const { startICS, endICS } = parseEventDates(e);
+  const title = e.title || 'Evento Ciudad Viva';
+  const description = (e.description || '').replace(/\n/g, '\\n');
+  const location = e.venue || e.town || '';
+
+  const icsContent = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Ciudad Viva//Agenda Cultural//ES', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT', `SUMMARY:${title}`, `DESCRIPTION:${description}`, `LOCATION:${location}`, `DTSTART:${startICS}`, `DTEND:${endICS}`, 'STATUS:CONFIRMED', 'END:VEVENT', 'END:VCALENDAR'
+  ].join('\r\n');
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${title.toLowerCase().replace(/[^a-z0-9]/gi, '_')}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function showAddToCalendarDialog(e) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: 'Añadir a mi calendario',
+      text: `"${e.title}"`,
+      icon: 'info',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: '📅 Google Calendar',
+      denyButtonText: '📥 Descargar iCal (.ics)',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#4285F4',
+      denyButtonColor: '#0f6674',
+      cancelButtonColor: '#64748b',
+    }).then((result) => {
+      if (result.isConfirmed) window.open(generateGoogleCalendarUrl(e), '_blank');
+      else if (result.isDenied) downloadIcsFile(e);
+    });
+  } else {
+    window.open(generateGoogleCalendarUrl(e), '_blank');
+  }
+}
+
+function getEventShareUrl(e) {
+  const url = new URL(window.location.origin + window.location.pathname.replace('admin.html', 'index.html'));
+  url.searchParams.set('event', e.id);
+  return url.toString();
+}
+
+function shareEvent(e) {
+  const shareUrl = getEventShareUrl(e);
+  const shareText = `¡Mira este plan cultural en Ciudad Viva! "${e.title}" en ${e.venue || e.town}.`;
+
+  if (navigator.share && typeof navigator.share === 'function') {
+    navigator.share({ title: e.title, text: shareText, url: shareUrl }).catch(err => {
+      if (err.name !== 'AbortError') showCustomShareDialog(e, shareUrl, shareText);
+    });
+  } else {
+    showCustomShareDialog(e, shareUrl, shareText);
+  }
+}
+
+function showCustomShareDialog(e, shareUrl, shareText) {
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: 'Compartir Evento',
+      html: `
+        <p style="font-size:14px; color:#475569; margin-bottom:16px;"><b>"${e.title}"</b></p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + shareUrl)}" target="_blank" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; background:#25D366; color:white; border:0; text-decoration:none; padding:12px; border-radius:12px; font-weight:700; font-size:14px;">
+            📲 Compartir por WhatsApp
+          </a>
+          <a href="https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}" target="_blank" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; background:#0088cc; color:white; border:0; text-decoration:none; padding:12px; border-radius:12px; font-weight:700; font-size:14px;">
+            ✈️ Compartir por Telegram
+          </a>
+          <button id="btn-copy-link-admin" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-size:14px; font-weight:700; cursor:pointer;">
+            📋 Copiar Enlace Directo
+          </button>
+        </div>
+      `,
+      showConfirmButton: false,
+      showCloseButton: true,
+      didOpen: () => {
+        const copyBtn = document.getElementById('btn-copy-link-admin');
+        if (copyBtn) {
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(shareUrl).then(() => {
+              Swal.close();
+              notifySuccess('¡Enlace copiado al portapapeles!');
+            }).catch(() => {
+              prompt('Copia este enlace:', shareUrl);
+            });
+          };
+        }
+      }
+    });
+  }
+}
+
+window.openDetail = function(id) {
+  let e = events.find(ev => ev.id === id);
+  if(!e) return;
+
+  if ($('#dtag')) $('#dtag').textContent = e.category;
+  if ($('#dtitle')) $('#dtitle').textContent = e.title;
+  if ($('#ddesc')) $('#ddesc').textContent = e.description;
+  if ($('#dwhen')) $('#dwhen').textContent = (e.dateLabel || 'Próximamente') + ' · ' + e.time;
+  
+  const isFree = (e.price || '').toLowerCase().includes('gratis');
+  const priceBadge = $('#dprice-badge');
+  if (priceBadge) {
+    priceBadge.textContent = e.price;
+    priceBadge.className = `price-tag ${isFree ? '' : 'paid'}`;
+  }
+
+function getGoogleMapsUrl(venue, town, locObj) {
+  if (locObj && locObj.mapsUrl && locObj.mapsUrl.trim() !== '') {
+    return locObj.mapsUrl.trim();
+  }
+  const queryParts = [];
+  if (venue) queryParts.push(venue);
+  if (town) queryParts.push(town);
+  const searchQuery = encodeURIComponent(queryParts.join(', '));
+  return `https://www.google.com/maps/search/?api=1&query=${searchQuery}`;
+}
+
+  const locObj = locations.find(loc => getLocationDisplayName(loc) === e.venue || loc.name === e.venue);
+  const mapsUrl = getGoogleMapsUrl(e.venue, e.town, locObj);
+  
+  if ($('#dwhere')) {
+    $('#dwhere').textContent = e.venue;
+  }
+
+  const btnCal = $('#btn-add-calendar');
+  if (btnCal) btnCal.onclick = () => showAddToCalendarDialog(e);
+
+  const btnShare = $('#btn-share-event');
+  if (btnShare) btnShare.onclick = () => shareEvent(e);
+
+  const linksEl = $('#modal-links');
+  if (linksEl) {
+    let linksHtml = `<a href="${mapsUrl}" target="_blank" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;">📍 Abrir ubicación en Google Maps ↗</a>`;
+    if (e.linkFacebook) linksHtml += `<a href="${e.linkFacebook}" target="_blank">📘 Publicación en Facebook ↗</a>`;
+    if (e.linkWeb) linksHtml += `<a href="${e.linkWeb}" target="_blank">🌐 Web Oficial / Venta de Entradas ↗</a>`;
+    linksEl.innerHTML = linksHtml;
+  }
+
+  const galleryEl = $('#modal-gallery');
+  const photos = e.photos || [];
+  const primaryIdx = e.primaryPhotoIdx || 0;
+
+  if (photos.length > 0) {
+    const sorted = [...photos];
+    if (primaryIdx > 0 && primaryIdx < sorted.length) {
+      const p = sorted.splice(primaryIdx, 1)[0];
+      sorted.unshift(p);
+    }
+    activeGalleryPhotos = sorted;
+
+    galleryEl.style.display = 'grid';
+    galleryEl.className = `modal-gallery count-${sorted.length}`;
+
+    if (sorted.length === 1) {
+      galleryEl.innerHTML = `<img src="${sorted[0]}" class="main-photo" alt="Cartel" onclick="openLightbox(0)">`;
+    } else if (sorted.length === 2) {
+      galleryEl.innerHTML = `
+        <img src="${sorted[0]}" class="main-photo" alt="Foto 1" onclick="openLightbox(0)">
+        <img src="${sorted[1]}" class="sub-photo" alt="Foto 2" onclick="openLightbox(1)">
+      `;
+    } else {
+      galleryEl.innerHTML = `
+        <img src="${sorted[0]}" class="main-photo" alt="Foto 1" onclick="openLightbox(0)">
+        <img src="${sorted[1]}" class="sub-photo" alt="Foto 2" onclick="openLightbox(1)">
+        <img src="${sorted[2]}" class="sub-photo" alt="Foto 3" onclick="openLightbox(2)">
+      `;
+    }
+  } else {
+    activeGalleryPhotos = [];
+    galleryEl.style.display = 'none';
+  }
+
+  $('#detail').classList.add('on');
+};
+
+window.closeDetail = () => $('#detail').classList.remove('on');
+
+window.openLightbox = (index) => {
+  if (!activeGalleryPhotos.length) return;
+  currentLightboxIdx = index;
+  updateLightbox();
+  $('#lightbox').classList.add('on');
+};
+
+window.closeLightbox = () => $('#lightbox').classList.remove('on');
+
+function updateLightbox() {
+  if ($('#lb-img')) $('#lb-img').src = activeGalleryPhotos[currentLightboxIdx];
+  if ($('#lb-counter')) $('#lb-counter').textContent = `${currentLightboxIdx + 1} / ${activeGalleryPhotos.length}`;
+  const showNav = activeGalleryPhotos.length > 1;
+  if ($('.lb-prev')) $('.lb-prev').style.display = showNav ? 'flex' : 'none';
+  if ($('.lb-next')) $('.lb-next').style.display = showNav ? 'flex' : 'none';
+}
+
+window.prevLightboxPhoto = () => {
+  currentLightboxIdx = (currentLightboxIdx - 1 + activeGalleryPhotos.length) % activeGalleryPhotos.length;
+  updateLightbox();
+};
+
+window.nextLightboxPhoto = () => {
+  currentLightboxIdx = (currentLightboxIdx + 1) % activeGalleryPhotos.length;
+  updateLightbox();
+};
+
+// Carga Inicial de datos para Administración
 Promise.all([loadTowns(), loadLocations(), loadEvents()]);
