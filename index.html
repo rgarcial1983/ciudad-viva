@@ -3,6 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="icons/favicon.jpg">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -10,9 +15,12 @@
 <body>
 <main class="app">
   <header class="top">
-    <div class="brand">
-      <h1>Ciudad Viva</h1>
-      <p>Agenda cultural y planes de ocio en la comarca</p>
+    <div class="brand" style="display:flex; align-items:center; gap:12px;">
+      <img src="assets/logo.jpg" alt="Ciudad Viva Logo" style="height:44px; width:44px; border-radius:11px; object-fit:cover; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+      <div>
+        <h1 style="margin:0; font-size:24px; font-weight:800;">Ciudad Viva</h1>
+        <p style="margin:2px 0 0; font-size:13px; color:var(--text-muted);">Agenda cultural y planes de ocio en la comarca</p>
+      </div>
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
       <button id="theme-toggle" class="btn-secondary" style="padding:8px 14px;" title="Cambiar tema">🌙 Modo Oscuro</button>
@@ -145,5 +153,12 @@
 </div>
 
 <script type="module" src="js/citizen.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
+  });
+}
+</script>
 </body>
 </html>

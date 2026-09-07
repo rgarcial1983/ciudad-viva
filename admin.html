@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="icons/favicon.jpg">
   <link rel="stylesheet" href="css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -10,9 +13,12 @@
 <body>
 <main class="app">
   <header class="top">
-    <div class="brand">
-      <h1>Ciudad Viva</h1>
-      <p>Panel de Administración y Gestores Culturales</p>
+    <div class="brand" style="display:flex; align-items:center; gap:12px;">
+      <img src="assets/logo.jpg" alt="Ciudad Viva Logo" style="height:44px; width:44px; border-radius:11px; object-fit:cover; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+      <div>
+        <h1 style="margin:0; font-size:24px; font-weight:800;">Ciudad Viva</h1>
+        <p style="margin:2px 0 0; font-size:13px; color:var(--text-muted);">Panel de Administración y Gestores Culturales</p>
+      </div>
     </div>
     <nav class="tabs" style="align-items:center;">
       <button id="admin-theme-toggle" class="tab" style="border:0;" title="Cambiar tema">🌙 Modo Oscuro</button>
@@ -84,24 +90,57 @@
               <p class="muted">Vista general de actividad, municipios y estadísticas de la plataforma.</p>
             </div>
           </div>
+
           <div class="stats">
-            <div class="stat"><b id="summary-towns-count">0</b><span class="muted">Municipios</span></div>
-            <div class="stat"><b id="summary-cats-count">0</b><span class="muted">Categorías</span></div>
-            <div class="stat"><b id="summary-venues-count">0</b><span class="muted">Lugares activos</span></div>
-            <div class="stat"><b id="summary-events-count">0</b><span class="muted">Eventos activos</span></div>
+            <div class="stat">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b id="summary-towns-count" style="font-size:28px; color:var(--primary);">0</b>
+                <span style="font-size:24px;">🏙️</span>
+              </div>
+              <span class="muted" style="font-weight:600; font-size:13px;">Municipios asignados</span>
+            </div>
+            <div class="stat">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b id="summary-events-count" style="font-size:28px; color:var(--primary);">0</b>
+                <span style="font-size:24px;">📅</span>
+              </div>
+              <span class="muted" style="font-weight:600; font-size:13px;">Total eventos activos</span>
+            </div>
+            <div class="stat">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b id="summary-events-month-count" style="font-size:28px; color:#059669;">0</b>
+                <span style="font-size:24px;">🗓️</span>
+              </div>
+              <span class="muted" style="font-weight:600; font-size:13px;">Eventos este mes</span>
+            </div>
+            <div class="stat">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b id="summary-venues-count" style="font-size:28px; color:#d97706;">0</b>
+                <span style="font-size:24px;">📍</span>
+              </div>
+              <span class="muted" style="font-weight:600; font-size:13px;">Espacios culturales</span>
+            </div>
           </div>
-          <div class="admin-grid">
+
+          <div class="admin-grid" style="margin-bottom: 20px;">
             <div class="panel">
-              <h3>Últimos eventos publicados</h3>
-              <div id="summary-recent-events" style="display:flex; flex-direction:column; gap:10px;">
+              <h3 style="margin-top:0; font-size:16px;">Últimos eventos publicados</h3>
+              <div id="summary-recent-events" style="display:flex; flex-direction:column; gap:4px;">
                 <p class="muted">Cargando datos...</p>
               </div>
             </div>
             <div class="panel">
-              <h3>Últimos lugares añadidos</h3>
-              <div id="summary-recent-venues" style="display:flex; flex-direction:column; gap:10px;">
+              <h3 style="margin-top:0; font-size:16px;">Distribución por categorías</h3>
+              <div id="summary-categories-breakdown" style="display:flex; flex-direction:column; gap:4px; padding-top:4px;">
                 <p class="muted">Cargando datos...</p>
               </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3 style="margin-top:0; font-size:16px;">Espacios culturales registrados</h3>
+            <div id="summary-recent-venues" style="display:flex; flex-direction:column; gap:4px;">
+              <p class="muted">Cargando datos...</p>
             </div>
           </div>
         </div>
@@ -209,7 +248,8 @@
           </div>
           <div class="admin-grid">
             <div class="panel">
-              <h3>Añadir Categoría</h3>
+              <h3 id="cat-form-title">Añadir Categoría</h3>
+              <input type="hidden" id="cat-edit-id" value="">
               <div class="form">
                 <div class="field-group">
                   <label for="new-cat-name">Nombre de la categoría</label>
@@ -219,18 +259,17 @@
                   <label for="new-cat-icon">Emoji / Icono</label>
                   <input id="new-cat-icon" placeholder="Ej. 🎭, 🎨, 🎪">
                 </div>
-                <button class="btn-primary" id="save-cat">Añadir categoría</button>
+                <div style="display:flex; gap:10px; margin-top:8px;">
+                  <button class="btn-primary" id="save-cat">Guardar categoría</button>
+                  <button class="btn-secondary" id="cancel-cat-edit" style="display:none;">Cancelar</button>
+                </div>
+                <span class="toast" id="toast-cat" style="display:none; color: green; font-size: 13px;">✔ Guardado con éxito.</span>
               </div>
             </div>
             <div class="panel">
               <h3>Categorías activas</h3>
               <div id="categories-list" style="display:flex; flex-direction:column; gap:10px;">
-                <div class="admin-list-item-simple">🎵 Música</div>
-                <div class="admin-list-item-simple">🏛️ Patrimonio</div>
-                <div class="admin-list-item-simple">🍴 Gastronomía</div>
-                <div class="admin-list-item-simple">🎨 Talleres</div>
-                <div class="admin-list-item-simple">🎬 Cine</div>
-                <div class="admin-list-item-simple">🏃 Deporte</div>
+                <p class="muted">Cargando categorías...</p>
               </div>
             </div>
           </div>
@@ -339,24 +378,32 @@
                   </div>
                 </div>
 
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; align-items:start;">
                   <div class="field-group">
-                    <label for="new-date">Fecha</label>
+                    <label for="new-date">Fecha de inicio</label>
                     <input type="date" id="new-date">
                   </div>
                   <div class="field-group">
-                    <label for="new-time">Hora de inicio</label>
-                    <input type="time" id="new-time" value="20:00">
+                    <label for="new-date-end">Fecha de fin <span class="muted" style="font-weight:normal;">(opcional)</span></label>
+                    <input type="date" id="new-date-end">
                   </div>
                 </div>
 
                 <div class="field-group">
-                  <label>Precio de la entrada</label>
-                  <div style="display:flex; gap:14px; align-items:center;">
+                  <label for="new-time">Hora / Horario de apertura</label>
+                  <input type="text" id="new-time" placeholder="Ej. 20:00 h o 10:00 a 20:00 h" value="20:00">
+                </div>
+
+                <div class="field-group">
+                  <label>Opciones y Precio de entrada</label>
+                  <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
                     <label style="font-weight:normal; display:flex; align-items:center; gap:6px; cursor:pointer;">
                       <input type="checkbox" id="new-price-free" checked> Evento Gratuito
                     </label>
-                    <div id="price-input-wrap" class="input-with-suffix" style="display:none; flex:1;">
+                    <label style="font-weight:600; color:#d97706; display:flex; align-items:center; gap:6px; cursor:pointer; background:#fffbeb; padding:4px 10px; border-radius:8px; border:1px solid #fef3c7;">
+                      <input type="checkbox" id="new-featured"> ⭐ Destacado en Portada
+                    </label>
+                    <div id="price-input-wrap" class="input-with-suffix" style="display:none; flex:1; min-width:140px;">
                       <input type="number" id="new-price-num" min="0" step="0.50" placeholder="0.00">
                       <span class="input-suffix">€</span>
                     </div>

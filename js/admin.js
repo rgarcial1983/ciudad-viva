@@ -1,5 +1,5 @@
 import { 
-  db, auth, eventsRef, locationsRef, townsRef, usersRef,
+  db, auth, eventsRef, locationsRef, townsRef, usersRef, categoriesRef,
   addDoc, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp,
   signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from "./firebase-config.js";
@@ -607,6 +607,148 @@ function resetVenueForm() {
 }
 
 // ----------------------------------------------------
+// GESTIÓN DE CATEGORÍAS (CATEGORIES)
+// ----------------------------------------------------
+let categories = [];
+
+const DEFAULT_CATEGORIES = [
+  { name: 'Música', icon: '🎵' },
+  { name: 'Patrimonio', icon: '🏛️' },
+  { name: 'Gastronomía', icon: '🍴' },
+  { name: 'Talleres', icon: '🎨' },
+  { name: 'Cine', icon: '🎬' },
+  { name: 'Deporte', icon: '🏃' }
+];
+
+async function loadCategories() {
+  try {
+    const snapshot = await getDocs(categoriesRef);
+    categories = [];
+    snapshot.forEach(docSnap => {
+      categories.push({ id: docSnap.id, ...docSnap.data() });
+    });
+
+    if (categories.length === 0) {
+      for (const cat of DEFAULT_CATEGORIES) {
+        await addDoc(categoriesRef, cat);
+      }
+      return loadCategories();
+    }
+
+    renderCategories();
+    updateCategorySelects();
+    updateSummaryStats();
+  } catch (e) {
+    console.error("Error al cargar categorías:", e);
+  }
+}
+
+function renderCategories() {
+  const listEl = $('#categories-list');
+  if (!listEl) return;
+
+  if (categories.length === 0) {
+    listEl.innerHTML = `<p class="muted">No hay categorías registradas.</p>`;
+    return;
+  }
+
+  listEl.innerHTML = categories.map(c => `
+    <div class="admin-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--card-bg); border:1px solid var(--border); border-radius:10px;">
+      <div>
+        <b style="font-size:15px; color:var(--text-main);">${c.icon || '🏷️'} ${c.name}</b>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-action-edit" onclick="editCategory('${c.id}')">✏️ Editar</button>
+        <button class="btn-action-delete" onclick="deleteCategory('${c.id}')">🗑️ Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateCategorySelects() {
+  const catSelect = $('#new-cat');
+  if (!catSelect) return;
+  const currentVal = catSelect.value;
+  catSelect.innerHTML = categories.map(c => `<option value="${c.name}">${c.icon || ''} ${c.name}</option>`).join('');
+  if (currentVal && categories.some(c => c.name === currentVal)) {
+    catSelect.value = currentVal;
+  }
+}
+
+window.editCategory = (id) => {
+  const c = categories.find(item => item.id === id);
+  if (!c) return;
+
+  if ($('#cat-edit-id')) $('#cat-edit-id').value = c.id;
+  if ($('#new-cat-name')) $('#new-cat-name').value = c.name;
+  if ($('#new-cat-icon')) $('#new-cat-icon').value = c.icon || '';
+
+  if ($('#cat-form-title')) $('#cat-form-title').textContent = "Editar Categoría";
+  if ($('#save-cat')) $('#save-cat').textContent = "Actualizar categoría";
+  if ($('#cancel-cat-edit')) $('#cancel-cat-edit').style.display = 'inline-block';
+};
+
+window.deleteCategory = async (id) => {
+  const c = categories.find(item => item.id === id);
+  if (!c) return;
+
+  const confirmed = await confirmDialog('¿Eliminar categoría?', `¿Seguro que quieres eliminar la categoría "${c.name}"?`);
+  if (!confirmed) return;
+
+  try {
+    await deleteDoc(doc(db, "categories", id));
+    notifySuccess(`Categoría "${c.name}" eliminada.`);
+    await loadCategories();
+  } catch(err) {
+    console.error(err);
+    notifyError('Error al eliminar categoría', err.message);
+  }
+};
+
+function resetCategoryForm() {
+  if ($('#cat-edit-id')) $('#cat-edit-id').value = '';
+  if ($('#new-cat-name')) $('#new-cat-name').value = '';
+  if ($('#new-cat-icon')) $('#new-cat-icon').value = '';
+  if ($('#cat-form-title')) $('#cat-form-title').textContent = "Añadir Categoría";
+  if ($('#save-cat')) $('#save-cat').textContent = "Guardar categoría";
+  if ($('#cancel-cat-edit')) $('#cancel-cat-edit').style.display = 'none';
+}
+
+if ($('#cancel-cat-edit')) {
+  $('#cancel-cat-edit').onclick = resetCategoryForm;
+}
+
+if ($('#save-cat')) {
+  $('#save-cat').onclick = async () => {
+    const id = $('#cat-edit-id') ? $('#cat-edit-id').value : '';
+    const name = $('#new-cat-name') ? $('#new-cat-name').value.trim() : '';
+    const icon = $('#new-cat-icon') ? $('#new-cat-icon').value.trim() : '';
+
+    if (!name) return notifyWarning('Escribe un nombre para la categoría.');
+
+    const catData = { name, icon };
+
+    try {
+      $('#save-cat').disabled = true;
+      if (id) {
+        await updateDoc(doc(db, "categories", id), catData);
+        notifySuccess(`Categoría "${name}" actualizada con éxito.`);
+      } else {
+        await addDoc(categoriesRef, catData);
+        notifySuccess(`Categoría "${name}" guardada con éxito.`);
+      }
+      resetCategoryForm();
+      await loadCategories();
+    } catch (err) {
+      console.error(err);
+      notifyError('Error al guardar categoría', err.message);
+    } finally {
+      if ($('#save-cat')) $('#save-cat').disabled = false;
+    }
+  };
+}
+
+// ----------------------------------------------------
 // GESTIÓN DE EVENTOS
 // ----------------------------------------------------
 async function loadEvents() {
@@ -771,20 +913,53 @@ function updateSummaryStats() {
   const scopedLocations = locations.filter(l => isTownAllowed(l.town || (l.name.match(/\(([^)]+)\)$/) ? l.name.match(/\(([^)]+)\)$/)[1] : '')));
   const scopedEvents = events.filter(e => isTownAllowed(e.town));
 
+  const now = new Date();
+  const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const eventsThisMonth = scopedEvents.filter(e => {
+    if (e.dateRaw && e.dateRaw.startsWith(currentYearMonth)) return true;
+    if (e.date && e.date.startsWith(currentYearMonth)) return true;
+    return false;
+  });
+
   if ($('#summary-towns-count')) $('#summary-towns-count').textContent = scopedTowns.length;
-  if ($('#summary-cats-count')) $('#summary-cats-count').textContent = 6;
-  if ($('#summary-venues-count')) $('#summary-venues-count').textContent = scopedLocations.length;
   if ($('#summary-events-count')) $('#summary-events-count').textContent = scopedEvents.length;
+  if ($('#summary-events-month-count')) $('#summary-events-month-count').textContent = eventsThisMonth.length;
+  if ($('#summary-venues-count')) $('#summary-venues-count').textContent = scopedLocations.length;
+
+  const catBreakdownEl = $('#summary-categories-breakdown');
+  if (catBreakdownEl) {
+    const catsList = categories && categories.length > 0 ? categories.map(c => c.name) : ['Música', 'Patrimonio', 'Gastronomía', 'Talleres', 'Cine', 'Deporte'];
+    const totalEvents = scopedEvents.length || 1;
+    
+    catBreakdownEl.innerHTML = catsList.map(cat => {
+      const count = scopedEvents.filter(e => e.category === cat).length;
+      const pct = Math.round((count / totalEvents) * 100);
+      return `
+        <div style="margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-bottom:3px;">
+            <span>${cat}</span>
+            <span class="muted">${count} ${count === 1 ? 'evento' : 'eventos'} (${pct}%)</span>
+          </div>
+          <div style="background:var(--border); height:7px; border-radius:4px; overflow:hidden;">
+            <div style="width:${pct}%; background:var(--primary); height:100%; border-radius:4px; transition:width 0.4s ease;"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
 
   const recEventsEl = $('#summary-recent-events');
   if (recEventsEl) {
     if (scopedEvents.length === 0) {
-      recEventsEl.innerHTML = `<p class="muted">No hay eventos recientes.</p>`;
+      recEventsEl.innerHTML = `<p class="muted" style="padding:8px 0;">No hay eventos recientes en tus municipios asignados.</p>`;
     } else {
       recEventsEl.innerHTML = scopedEvents.slice(0, 5).map(e => `
-        <div class="admin-list-item-simple">
-          <b>${e.title}</b><br>
-          <span class="muted" style="font-size:12px;">${e.category} · ${e.venue}</span>
+        <div style="padding:8px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <b style="font-size:13px; color:var(--text-main);">${e.title}</b><br>
+            <span class="muted" style="font-size:11px;">${e.category} · ${e.venue} (${getEventDateLabel(e)})</span>
+          </div>
+          <span style="font-size:11px; background:var(--primary-light); color:var(--primary); font-weight:700; padding:2px 8px; border-radius:6px; white-space:nowrap;">${e.town}</span>
         </div>
       `).join('');
     }
@@ -793,13 +968,20 @@ function updateSummaryStats() {
   const recVenuesEl = $('#summary-recent-venues');
   if (recVenuesEl) {
     if (scopedLocations.length === 0) {
-      recVenuesEl.innerHTML = `<p class="muted">No hay lugares recientes.</p>`;
+      recVenuesEl.innerHTML = `<p class="muted" style="padding:8px 0;">No hay espacios culturales registrados.</p>`;
     } else {
-      recVenuesEl.innerHTML = scopedLocations.slice(0, 5).map(v => `
-        <div class="admin-list-item-simple">
-          <b>${getLocationDisplayName(v)}</b>
-        </div>
-      `).join('');
+      recVenuesEl.innerHTML = scopedLocations.slice(0, 5).map(v => {
+        const vName = getLocationDisplayName(v);
+        const vEventsCount = scopedEvents.filter(e => e.venue === vName || (e.venue && e.venue.startsWith(v.name))).length;
+        return `
+          <div style="padding:8px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <b style="font-size:13px; color:var(--text-main);">${vName}</b>
+            </div>
+            <span class="muted" style="font-size:12px; font-weight:600;">${vEventsCount} ${vEventsCount === 1 ? 'evento' : 'eventos'}</span>
+          </div>
+        `;
+      }).join('');
     }
   }
 }
@@ -814,23 +996,38 @@ if ($('#btn-new-event')) {
   };
 }
 
-function formatDateLabel(dateStr) {
+function formatDateLabel(dateStr, dateEndStr = null) {
   if (!dateStr) return 'Próximamente';
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  const d = new Date(cleanStr + 'T00:00:00');
-  if (isNaN(d.getTime())) return dateStr;
+  const cleanStart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const dStart = new Date(cleanStart + 'T00:00:00');
+  if (isNaN(dStart.getTime())) return dateStr;
 
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+
+  if (dateEndStr && dateEndStr.trim() !== '' && dateEndStr !== cleanStart) {
+    const cleanEnd = dateEndStr.includes('T') ? dateEndStr.split('T')[0] : dateEndStr;
+    const dEnd = new Date(cleanEnd + 'T00:00:00');
+    if (!isNaN(dEnd.getTime()) && dEnd > dStart) {
+      if (dStart.getMonth() === dEnd.getMonth() && dStart.getFullYear() === dEnd.getFullYear()) {
+        return `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+      } else if (dStart.getFullYear() === dEnd.getFullYear()) {
+        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+      } else {
+        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${dStart.getFullYear()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${dEnd.getFullYear()}`;
+      }
+    }
+  }
+
+  return `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]}`;
 }
 
 function getEventDateLabel(e) {
   if (!e) return 'Próximamente';
-  if (e.dateRaw) return formatDateLabel(e.dateRaw);
-  if (e.date && e.date.includes('-')) return formatDateLabel(e.date);
+  if (e.dateRaw) return formatDateLabel(e.dateRaw, e.dateEndRaw || e.dateEnd);
+  if (e.date && e.date.includes('-')) return formatDateLabel(e.date, e.dateEnd);
   if (e.dateLabel) {
-    if (e.dateLabel.includes(',')) return e.dateLabel;
+    if (e.dateLabel.includes(',') || e.dateLabel.toLowerCase().includes('del')) return e.dateLabel;
     const m = e.dateLabel.match(/^(\d{1,2})\s+([A-Za-záéíóúÁÉÍÓÚ]+)(?:\s+(\d{4}))?$/);
     if (m) {
       const dayNum = parseInt(m[1], 10);
@@ -860,10 +1057,12 @@ window.editEvent = (id) => {
   if ($('#new-venue')) $('#new-venue').value = e.venue;
   
   if ($('#new-date') && e.dateRaw) $('#new-date').value = e.dateRaw;
+  if ($('#new-date-end')) $('#new-date-end').value = e.dateEndRaw || e.dateEnd || '';
   if ($('#new-time') && e.time) $('#new-time').value = e.time;
 
   const isFree = (e.price || '').toLowerCase().includes('gratis');
   $('#new-price-free').checked = isFree;
+  if ($('#new-featured')) $('#new-featured').checked = !!e.featured;
   $('#price-input-wrap').style.display = isFree ? 'none' : 'flex';
   if (!isFree && $('#new-price-num')) {
     $('#new-price-num').value = parseFloat((e.price || '').replace('€', '').trim()) || '';
@@ -911,9 +1110,11 @@ function resetEventForm() {
   $('#event-edit-id').value = '';
   $('#new-title').value = '';
   if ($('#new-date')) $('#new-date').value = '';
+  if ($('#new-date-end')) $('#new-date-end').value = '';
   if ($('#new-time')) $('#new-time').value = '20:00';
   
   $('#new-price-free').checked = true;
+  if ($('#new-featured')) $('#new-featured').checked = false;
   $('#price-input-wrap').style.display = 'none';
   if ($('#new-price-num')) $('#new-price-num').value = '';
 
@@ -936,11 +1137,13 @@ if ($('#save')) {
     if (!title) return notifyWarning('Escribe un título para el evento.');
 
     const isFree = $('#new-price-free').checked;
+    const isFeatured = $('#new-featured') ? $('#new-featured').checked : false;
     const priceVal = parseFloat($('#new-price-num').value);
     const formattedPrice = isFree || isNaN(priceVal) || priceVal <= 0 ? 'Gratis' : `${priceVal.toFixed(2)} €`;
 
     const dateRaw = $('#new-date').value;
-    const dateLabel = formatDateLabel(dateRaw);
+    const dateEndRaw = $('#new-date-end') ? $('#new-date-end').value : '';
+    const dateLabel = formatDateLabel(dateRaw, dateEndRaw);
     const selectedVenue = $('#new-venue').value;
 
     let eventTown = 'Úbeda';
@@ -954,10 +1157,12 @@ if ($('#save')) {
       category: $('#new-cat').value,
       town: eventTown,
       dateRaw: dateRaw,
+      dateEndRaw: dateEndRaw,
       dateLabel: dateLabel,
       time: $('#new-time').value || '20:00',
       venue: selectedVenue,
       price: formattedPrice,
+      featured: isFeatured,
       description: $('#new-desc').value.trim() || 'Evento municipal.',
       linkFacebook: $('#new-link-fb').value.trim(),
       linkWeb: $('#new-link-web').value.trim(),
@@ -1475,4 +1680,4 @@ window.nextLightboxPhoto = () => {
 };
 
 // Carga Inicial de datos para Administración
-Promise.all([loadTowns(), loadLocations(), loadEvents()]);
+Promise.all([loadTowns(), loadLocations(), loadEvents(), loadCategories()]);

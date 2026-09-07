@@ -24,6 +24,7 @@ const eventsRef = collection(db, "events");
 const locationsRef = collection(db, "locations");
 const townsRef = collection(db, "towns");
 const usersRef = collection(db, "users");
+const categoriesRef = collection(db, "categories");
 
 export {
   app,
@@ -33,6 +34,7 @@ export {
   locationsRef,
   townsRef,
   usersRef,
+  categoriesRef,
   addDoc,
   getDocs,
   doc,

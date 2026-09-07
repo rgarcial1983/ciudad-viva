@@ -680,23 +680,38 @@ document.querySelectorAll('.chip-item').forEach(chip => {
   };
 });
 
-function formatDateLabel(dateStr) {
+function formatDateLabel(dateStr, dateEndStr = null) {
   if (!dateStr) return 'Próximamente';
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  const d = new Date(cleanStr + 'T00:00:00');
-  if (isNaN(d.getTime())) return dateStr;
+  const cleanStart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const dStart = new Date(cleanStart + 'T00:00:00');
+  if (isNaN(dStart.getTime())) return dateStr;
 
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+
+  if (dateEndStr && dateEndStr.trim() !== '' && dateEndStr !== cleanStart) {
+    const cleanEnd = dateEndStr.includes('T') ? dateEndStr.split('T')[0] : dateEndStr;
+    const dEnd = new Date(cleanEnd + 'T00:00:00');
+    if (!isNaN(dEnd.getTime()) && dEnd > dStart) {
+      if (dStart.getMonth() === dEnd.getMonth() && dStart.getFullYear() === dEnd.getFullYear()) {
+        return `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+      } else if (dStart.getFullYear() === dEnd.getFullYear()) {
+        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+      } else {
+        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${dStart.getFullYear()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${dEnd.getFullYear()}`;
+      }
+    }
+  }
+
+  return `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]}`;
 }
 
 function getEventDateLabel(e) {
   if (!e) return 'Próximamente';
-  if (e.dateRaw) return formatDateLabel(e.dateRaw);
-  if (e.date && e.date.includes('-')) return formatDateLabel(e.date);
+  if (e.dateRaw) return formatDateLabel(e.dateRaw, e.dateEndRaw || e.dateEnd);
+  if (e.date && e.date.includes('-')) return formatDateLabel(e.date, e.dateEnd);
   if (e.dateLabel) {
-    if (e.dateLabel.includes(',')) return e.dateLabel;
+    if (e.dateLabel.includes(',') || e.dateLabel.toLowerCase().includes('del')) return e.dateLabel;
     const m = e.dateLabel.match(/^(\d{1,2})\s+([A-Za-záéíóúÁÉÍÓÚ]+)(?:\s+(\d{4}))?$/);
     if (m) {
       const dayNum = parseInt(m[1], 10);

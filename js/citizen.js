@@ -1,5 +1,5 @@
 import { 
-  db, eventsRef, locationsRef, townsRef, getDocs 
+  db, eventsRef, locationsRef, townsRef, categoriesRef, getDocs 
 } from "./firebase-config.js";
 
 let selectedCategory = '';
@@ -14,23 +14,38 @@ let observer = null;
 
 const $ = s => document.querySelector(s);
 
-function formatDateLabel(dateStr) {
+function formatDateLabel(dateStr, dateEndStr = null) {
   if (!dateStr) return 'Próximamente';
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  const d = new Date(cleanStr + 'T00:00:00');
-  if (isNaN(d.getTime())) return dateStr;
+  const cleanStart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  const dStart = new Date(cleanStart + 'T00:00:00');
+  if (isNaN(dStart.getTime())) return dateStr;
 
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+
+  if (dateEndStr && dateEndStr.trim() !== '' && dateEndStr !== cleanStart) {
+    const cleanEnd = dateEndStr.includes('T') ? dateEndStr.split('T')[0] : dateEndStr;
+    const dEnd = new Date(cleanEnd + 'T00:00:00');
+    if (!isNaN(dEnd.getTime()) && dEnd > dStart) {
+      if (dStart.getMonth() === dEnd.getMonth() && dStart.getFullYear() === dEnd.getFullYear()) {
+        return `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+      } else if (dStart.getFullYear() === dEnd.getFullYear()) {
+        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+      } else {
+        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${dStart.getFullYear()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${dEnd.getFullYear()}`;
+      }
+    }
+  }
+
+  return `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]}`;
 }
 
 function getEventDateLabel(e) {
   if (!e) return 'Próximamente';
-  if (e.dateRaw) return formatDateLabel(e.dateRaw);
-  if (e.date && e.date.includes('-')) return formatDateLabel(e.date);
+  if (e.dateRaw) return formatDateLabel(e.dateRaw, e.dateEndRaw || e.dateEnd);
+  if (e.date && e.date.includes('-')) return formatDateLabel(e.date, e.dateEnd);
   if (e.dateLabel) {
-    if (e.dateLabel.includes(',')) return e.dateLabel;
+    if (e.dateLabel.includes(',') || e.dateLabel.toLowerCase().includes('del')) return e.dateLabel;
     const m = e.dateLabel.match(/^(\d{1,2})\s+([A-Za-záéíóúÁÉÍÓÚ]+)(?:\s+(\d{4}))?$/);
     if (m) {
       const dayNum = parseInt(m[1], 10);
@@ -275,17 +290,72 @@ window.toggleFavorite = (eventId, event) => {
   }
 };
 
-// Chips de categoría
-document.querySelectorAll('.chip-item').forEach(chip => {
-  chip.onclick = () => {
-    document.querySelectorAll('.chip-item').forEach(c => c.classList.remove('on'));
-    chip.classList.add('on');
-    selectedCategory = chip.dataset.cat || '';
-    showOnlyFavorites = chip.dataset.favs === 'true';
-    visibleCount = 6;
-    draw();
-  };
-});
+// ----------------------------------------------------
+// GESTIÓN DE CATEGORÍAS EN VISTA CIUDADANA
+// ----------------------------------------------------
+let categories = [];
+
+const DEFAULT_CATEGORIES = [
+  { name: 'Música', icon: '🎵' },
+  { name: 'Patrimonio', icon: '🏛️' },
+  { name: 'Gastronomía', icon: '🍴' },
+  { name: 'Talleres', icon: '🎨' },
+  { name: 'Cine', icon: '🎬' },
+  { name: 'Deporte', icon: '🏃' }
+];
+
+async function loadCategories() {
+  try {
+    const snapshot = await getDocs(categoriesRef);
+    categories = [];
+    snapshot.forEach(docSnap => {
+      categories.push({ id: docSnap.id, ...docSnap.data() });
+    });
+
+    if (categories.length === 0) {
+      categories = DEFAULT_CATEGORIES;
+    }
+
+    renderCategoryChips();
+  } catch (e) {
+    console.error("Error al cargar categorías en vista ciudadana:", e);
+    categories = DEFAULT_CATEGORIES;
+    renderCategoryChips();
+  }
+}
+
+function renderCategoryChips() {
+  const chipsRow = $('.chips-row');
+  if (!chipsRow) return;
+
+  const favCount = getFavorites().length;
+
+  let html = `<button class="chip-item ${!selectedCategory && !showOnlyFavorites ? 'on' : ''}" data-cat="">Todas</button>`;
+  html += `<button class="chip-item chip-fav ${showOnlyFavorites ? 'on' : ''}" data-favs="true">❤️ Favoritos (<span id="favs-badge">${favCount}</span>)</button>`;
+
+  html += categories.map(c => {
+    const isOn = selectedCategory === c.name && !showOnlyFavorites;
+    return `<button class="chip-item ${isOn ? 'on' : ''}" data-cat="${c.name}">${c.icon || ''} ${c.name}</button>`;
+  }).join('');
+
+  chipsRow.innerHTML = html;
+  bindChipListeners();
+}
+
+function bindChipListeners() {
+  document.querySelectorAll('.chip-item').forEach(chip => {
+    chip.onclick = () => {
+      document.querySelectorAll('.chip-item').forEach(c => c.classList.remove('on'));
+      chip.classList.add('on');
+      selectedCategory = chip.dataset.cat || '';
+      showOnlyFavorites = chip.dataset.favs === 'true';
+      visibleCount = 6;
+      draw();
+    };
+  });
+}
+
+bindChipListeners();
 
 // ----------------------------------------------------
 // FILTRADO AVANZADO DE FECHAS (Hoy, Mañana, Fin de Semana, Personalizada)
@@ -329,27 +399,33 @@ function matchesDateFilter(e, dateFilterVal, customDateVal) {
   const tomorrowStr = getFormattedDate(1);
   const weekendDates = getWeekendDates();
 
-  const eDate = e.dateRaw || '';
+  const eStart = e.dateRaw || e.date || '';
+  const eEnd = e.dateEndRaw || e.dateEnd || eStart;
   const eLabel = (e.dateLabel || e.date || '').toLowerCase();
 
+  const isInRange = (targetDate) => {
+    if (!eStart) return false;
+    return targetDate >= eStart && targetDate <= eEnd;
+  };
+
   if (dateFilterVal === 'today') {
-    if (eDate) return eDate === todayStr;
+    if (eStart) return isInRange(todayStr);
     return eLabel.includes('hoy');
   }
 
   if (dateFilterVal === 'tomorrow') {
-    if (eDate) return eDate === tomorrowStr;
+    if (eStart) return isInRange(tomorrowStr);
     return eLabel.includes('mañana');
   }
 
   if (dateFilterVal === 'weekend') {
-    if (eDate) return weekendDates.includes(eDate);
+    if (eStart) return weekendDates.some(d => isInRange(d));
     return eLabel.includes('sábado') || eLabel.includes('domingo') || eLabel.includes('viernes');
   }
 
   if (dateFilterVal === 'custom') {
     if (!customDateVal) return true;
-    if (eDate) return eDate === customDateVal;
+    if (eStart) return isInRange(customDateVal);
     return false;
   }
 
@@ -372,6 +448,8 @@ function draw() {
     (!t || e.town === t) &&
     matchesDateFilter(e, dateVal, customDateVal)
   );
+
+  shown.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
 
   const countEl = $('#count');
   if (countEl) countEl.textContent = shown.length + ' actividades';
@@ -399,18 +477,20 @@ function draw() {
         const hasImg = !!coverUrl;
         const bgStyle = hasImg ? `background-image:url('${coverUrl}');` : 'background:#e2e8f0;';
         const galleryBadge = photos.length > 1 ? `<span class="badge-gallery">${photos.length} fotos</span>` : '';
+        const featuredBadge = e.featured ? `<span class="badge-featured" style="position:absolute; bottom:12px; left:12px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; font-size:11px; font-weight:800; padding:3px 9px; border-radius:20px; z-index:2; box-shadow:0 2px 6px rgba(0,0,0,0.2);">⭐ Destacado</span>` : '';
         const isFree = (e.price || '').toLowerCase().includes('gratis');
         const isFav = favsList.includes(e.id);
 
         return `
-          <article class="card">
+          <article class="card ${e.featured ? 'card-featured' : ''}">
             <div class="visual" style="${bgStyle}">
               <span class="pill-time">${getEventDateLabel(e)} · ${e.time || ''}</span>
               <button class="btn-fav ${isFav ? 'is-fav' : ''}" title="${isFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}" onclick="toggleFavorite('${e.id}', event)">
                 ${isFav ? '❤️' : '🤍'}
               </button>
+              ${featuredBadge}
               ${galleryBadge}
-              <span>${e.town}</span>
+              <span style="cursor:pointer;" onclick="openTownModal('${e.town}')" title="Ver información de ${e.town}">🏰 ${e.town}</span>
             </div>
             <div class="card-body">
               <div class="card-meta">
@@ -719,6 +799,48 @@ function getGoogleMapsUrl(venue, town, locObj) {
 
 window.closeDetail = () => $('#detail').classList.remove('on');
 
+window.openTownModal = function(townName) {
+  const townObj = towns.find(t => t.name === townName) || { name: townName, province: 'Jaén' };
+  const townEvents = events.filter(e => e.town === townName);
+  const townVenues = locations.filter(l => l.town === townName || (l.name && l.name.includes(townName)));
+
+  if (typeof Swal !== 'undefined') {
+    Swal.fire({
+      title: `🏰 ${townObj.name}`,
+      html: `
+        <div style="text-align:left; font-size:14px; color:var(--text-main);">
+          <p style="margin:0 0 12px; font-weight:600; color:#2563eb;">Municipio de ${townObj.name} (${townObj.province || 'Jaén'})</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; background:var(--bg); padding:12px; border-radius:12px; border:1px solid var(--border);">
+            <div><b style="font-size:18px; color:var(--text-main);">${townEvents.length}</b><br><span style="font-size:12px; color:var(--text-muted);">Eventos en agenda</span></div>
+            <div><b style="font-size:18px; color:var(--text-main);">${townVenues.length}</b><br><span style="font-size:12px; color:var(--text-muted);">Espacios culturales</span></div>
+          </div>
+          <p style="font-weight:700; margin:0 0 8px;">Próximas actividades en ${townObj.name}:</p>
+          ${townEvents.length === 0 ? '<p class="muted">No hay eventos programados próximamente.</p>' : 
+            townEvents.slice(0, 4).map(ev => `
+              <div style="padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+                <b>${ev.title}</b><br>
+                <span class="muted" style="font-size:11px;">${ev.category} · ${getEventDateLabel(ev)}</span>
+              </div>
+            `).join('')
+          }
+        </div>
+      `,
+      confirmButtonText: 'Filtrar agenda por este municipio',
+      confirmButtonColor: '#2563eb',
+      showCloseButton: true
+    }).then((res) => {
+      if (res.isConfirmed) {
+        const townSelect = $('#town');
+        if (townSelect) {
+          townSelect.value = townName;
+          visibleCount = 6;
+          draw();
+        }
+      }
+    });
+  }
+};
+
 // Lightbox
 window.openLightbox = (index) => {
   if (!activeGalleryPhotos.length) return;
@@ -768,4 +890,4 @@ if (detailEl) {
 }
 
 // Carga inicial
-Promise.all([loadTowns(), loadLocations(), loadEvents()]);
+Promise.all([loadTowns(), loadLocations(), loadEvents(), loadCategories()]);

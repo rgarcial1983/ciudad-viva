@@ -701,9 +701,10 @@ button { font-family: inherit; }
 .panel { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow-sm); }
 .panel h3 { margin-top: 0; font-size: 18px; }
 .form { display: grid; gap: 14px; }
-.field-group { display: flex; flex-direction: column; gap: 4px; }
-.field-group label { font-size: 13px; font-weight: 600; color: var(--text-main); }
-.form input, .form select, .form textarea { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: inherit; outline: none; transition: border-color 0.2s; }
+.field-group { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field-group label { font-size: 13px; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.form input, .form select, .form textarea { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: inherit; outline: none; transition: border-color 0.2s; box-sizing: border-box; width: 100%; }
+.form input[type="date"] { padding: 9px 8px; font-size: 13px; min-width: 0; }
 .form input:focus, .form select:focus, .form textarea:focus { border-color: var(--primary); }
 .input-with-suffix { display: flex; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .input-with-suffix input { border: 0 !important; flex: 1; outline: none; }
