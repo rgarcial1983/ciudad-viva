@@ -33,7 +33,28 @@
 - Logotipo oficial maximizado (Pin de Ubicación con Nota Musical y destellos solares).
 - Conmutador de tema `🌙 Modo Oscuro / ☀️ Modo Claro` con persistencia de preferencia.
 
-### 🛠️ 6. Panel de Gestión (Admin)
+### 🗺️ 6. Mapa Interactivo de Eventos & Geolocalización
+- Alternancia sencilla entre vistas `📋 Lista` y `🗺️ Mapa` integrada en la agenda.
+- Pines interactivos geolocalizados con Leaflet.js basados en las coordenadas reales de cada recinto.
+- Algoritmo de desplazamiento micro-geográfico para evitar solapamiento cuando varios eventos se celebran en el mismo recinto o municipio.
+- Tarjetas flotantes emergentes (*popups*) con fecha, categoría, recinto y acceso directo al detalle del evento.
+
+### 📄 7. Exportación de Agenda a PDF
+- Generación instantánea de la agenda cultural en formato PDF mediante `html2pdf.js`.
+- Respeta los filtros aplicados en pantalla (municipio, categoría, fechas o favoritos) y el idioma activo.
+
+### 📤 8. Compartir Enriquecido & Deep-Linking
+- Enlaces profundos únicos por evento (`?event=ID`) con apertura automática del modal de detalle al recibir o abrir el enlace.
+- Modal de compartir rápido con integración a WhatsApp, Telegram, X (Twitter) y opción de copiar URL al portapapeles.
+
+### 📷 9. Vista Google Street View 360°
+- Enlace directo `📷 Ver en Google Street View 360° ↗` en cada ficha de detalle de evento para explorar la fachada y los alrededores del recinto en vista panorámica.
+
+### 🌍 10. Soporte Multi-idioma (Español / Inglés)
+- Selector dinámico mediante insignias de banderas (`🇪🇸 ES` / `🇬🇧 EN`) en la cabecera.
+- Traducción en tiempo real de interfaz, filtros, botones, categorías, exportación PDF y vistas de mapa.
+
+### 🛠️ 11. Panel de Gestión (Admin)
 - Control CRUD completo para gestores culturales (creación, modificación y borrado de eventos, recintos, municipios y categorías).
 - Carga de imágenes por URL y fechas extendidas para eventos de múltiples días.
 
@@ -42,8 +63,9 @@
 ## 💻 Arquitectura Tecnológica
 
 - **Frontend:** HTML5 semántico, CSS3 moderno (Custom Properties, Grid & Flexbox) y JS ES Modules.
+- **Mapas & Geolocalización:** Leaflet.js & OpenStreetMap.
 - **Base de Datos en Tiempo Real:** Cloud Firestore (`events`, `locations`, `towns`, `categories`).
-- **Librerías Auxiliares:** SweetAlert2 (Modales interactivos) y html2pdf.js (Exportación de fichas/programas).
+- **Librerías Auxiliares:** SweetAlert2 (Modales interactivos) y html2pdf.js (Exportación de fichas/programas PDF).
 - **Despliegue & Hosting:** Firebase Hosting con CDN global y certificado SSL automático.
 
 ---
