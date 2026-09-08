@@ -179,9 +179,8 @@ async function loadEvents() {
 // COMPARTIR EVENTO Y ENLACES DIRECTOS (URL ?event=ID)
 // ----------------------------------------------------
 function getEventShareUrl(e) {
-  const url = new URL(window.location.href);
-  url.searchParams.set('event', e.id);
-  return url.toString();
+  const baseUrl = window.location.href.split('?')[0].split('#')[0];
+  return `${baseUrl}?event=${e.id}`;
 }
 
 function shareEvent(e) {
@@ -206,18 +205,21 @@ function shareEvent(e) {
 function showCustomShareDialog(e, shareUrl, shareText) {
   if (typeof Swal !== 'undefined') {
     Swal.fire({
-      title: 'Compartir Evento',
+      title: t('share_modal_title'),
       html: `
         <p style="font-size:14px; color:#475569; margin-bottom:16px;"><b>"${e.title}"</b></p>
         <div style="display:flex; flex-direction:column; gap:10px;">
           <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(shareText + ' ' + shareUrl)}" target="_blank" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; background:#25D366; color:white; border:0; text-decoration:none; padding:12px; border-radius:12px; font-weight:700; font-size:14px;">
-            📲 Compartir por WhatsApp
+            ${t('share_ws')}
           </a>
           <a href="https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}" target="_blank" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; background:#0088cc; color:white; border:0; text-decoration:none; padding:12px; border-radius:12px; font-weight:700; font-size:14px;">
-            ✈️ Compartir por Telegram
+            ${t('share_tg')}
+          </a>
+          <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}" target="_blank" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; background:#0f172a; color:white; border:0; text-decoration:none; padding:12px; border-radius:12px; font-weight:700; font-size:14px;">
+            ${t('share_x')}
           </a>
           <button id="btn-copy-link" class="btn-secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-size:14px; font-weight:700; cursor:pointer;">
-            📋 Copiar Enlace Directo
+            ${t('share_copy')}
           </button>
         </div>
       `,
@@ -236,10 +238,10 @@ function showCustomShareDialog(e, shareUrl, shareText) {
                   showConfirmButton: false,
                   timer: 2500,
                   timerProgressBar: true
-                }).fire({ icon: 'success', title: '¡Enlace copiado al portapapeles!' });
+                }).fire({ icon: 'success', title: t('share_copied') });
               }
             }).catch(() => {
-              prompt('Copia este enlace:', shareUrl);
+              prompt(t('share_copy'), shareUrl);
             });
           };
         }
@@ -453,9 +455,28 @@ function matchesDateFilter(e, dateFilterVal, customDateVal) {
   return eLabel.includes(dateFilterVal.toLowerCase());
 }
 
-// Renderizar tarjetas de la vista ciudadana
-function draw() {
-  updateFavsBadge();
+// ----------------------------------------------------
+// NUEVAS FUNCIONALIDADES: MAPA, EXPORTAR PDF Y DEEP-LINKING
+// ----------------------------------------------------
+
+let activeViewMode = 'list'; // 'list' | 'map'
+let leafletMap = null;
+let mapMarkers = [];
+
+const TOWN_COORDINATES = {
+  'Úbeda': { lat: 38.0116, lng: -3.3687 },
+  'Baeza': { lat: 37.9942, lng: -3.4682 },
+  'Jaén': { lat: 37.7796, lng: -3.7849 },
+  'Cazorla': { lat: 37.9133, lng: -3.0044 },
+  'Linares': { lat: 38.0931, lng: -3.6346 },
+  'Andújar': { lat: 38.0384, lng: -4.0531 },
+  'Martos': { lat: 37.7214, lng: -3.9658 },
+  'Alcalá la Real': { lat: 37.4623, lng: -3.9231 },
+  'Jódar': { lat: 37.8415, lng: -3.3533 },
+  'Torredelcampo': { lat: 37.7828, lng: -3.9048 }
+};
+
+function getFilteredEvents() {
   const favsList = getFavorites();
   let q = ($('#search') ? $('#search').value : '').toLowerCase();
   let selectedTown = ($('#town') ? $('#town').value : '');
@@ -471,9 +492,218 @@ function draw() {
   );
 
   shown.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+  return shown;
+}
+
+function initOrUpdateMap(filteredEvents) {
+  const mapWrap = $('#events-map-wrap');
+  if (!mapWrap || mapWrap.style.display === 'none') return;
+  if (typeof L === 'undefined') return;
+
+  if (!leafletMap) {
+    leafletMap = L.map('events-map').setView([37.9942, -3.4682], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(leafletMap);
+  }
+
+  mapMarkers.forEach(m => leafletMap.removeLayer(m));
+  mapMarkers = [];
+
+  const bounds = [];
+  const coordCounts = {};
+
+  filteredEvents.forEach(e => {
+    let coords = null;
+
+    // 1. Look up venue in locations dataset
+    if (locations && locations.length > 0) {
+      const locObj = locations.find(l => {
+        if (!l) return false;
+        const dispName = getLocationDisplayName(l);
+        return (dispName && dispName === e.venue) ||
+               (l.name && l.name === e.venue) ||
+               (l.name && e.venue && e.venue.includes(l.name)) ||
+               (dispName && e.venue && e.venue.includes(dispName));
+      });
+      if (locObj && locObj.lat && locObj.lng) {
+        const parsedLat = parseFloat(locObj.lat);
+        const parsedLng = parseFloat(locObj.lng);
+        if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+          coords = { lat: parsedLat, lng: parsedLng };
+        }
+      }
+    }
+
+    // 2. Fallback to town coordinates
+    if (!coords && e.town && TOWN_COORDINATES[e.town]) {
+      coords = { lat: TOWN_COORDINATES[e.town].lat, lng: TOWN_COORDINATES[e.town].lng };
+    }
+
+    // 3. Ultimate default fallback
+    if (!coords) {
+      coords = { lat: 38.0116, lng: -3.3687 };
+    }
+
+    // 4. Offset overlapping coordinates so every event gets a visible, clickable pin
+    const coordKey = `${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}`;
+    const count = coordCounts[coordKey] || 0;
+    coordCounts[coordKey] = count + 1;
+
+    let finalLat = coords.lat;
+    let finalLng = coords.lng;
+
+    if (count > 0) {
+      const angle = count * (Math.PI / 3);
+      const radius = 0.00035 * Math.ceil(count / 6);
+      finalLat += radius * Math.cos(angle);
+      finalLng += radius * Math.sin(angle);
+    }
+
+    const popupHtml = `
+      <div class="map-popup-card">
+        <span style="font-size:11px; font-weight:800; color:#2563eb; text-transform:uppercase;">${translateCategory(e.category)}</span>
+        <h4 class="map-popup-title">${e.title}</h4>
+        <div class="map-popup-meta">
+          <span>📅 ${getEventDateLabel(e)}</span>
+          <span>🏰 ${e.town} · 🗺️ ${e.venue}</span>
+        </div>
+        <button class="map-popup-btn" onclick="openDetail('${e.id}')">${t('btn_detail')}</button>
+      </div>
+    `;
+
+    const marker = L.marker([finalLat, finalLng]).addTo(leafletMap);
+    marker.bindPopup(popupHtml);
+    mapMarkers.push(marker);
+    bounds.push([finalLat, finalLng]);
+  });
+
+  if (bounds.length > 0) {
+    if (bounds.length === 1) {
+      leafletMap.setView(bounds[0], 14);
+    } else {
+      leafletMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    }
+  }
+}
+
+function exportFilteredEventsPDF(filteredEvents) {
+  if (typeof html2pdf === 'undefined') {
+    alert('Error: html2pdf no está disponible');
+    return;
+  }
+
+  const isEn = getLang() === 'en';
+  const selectedTownName = $('#town') && $('#town').value ? $('#town').value : (isEn ? 'All Towns' : 'Todos los Municipios');
+  const nowStr = new Date().toLocaleDateString(isEn ? 'en-US' : 'es-ES');
+
+  const pdfContainer = document.createElement('div');
+  pdfContainer.style.padding = '24px';
+  pdfContainer.style.fontFamily = 'system-ui, sans-serif';
+  pdfContainer.style.color = '#0f172a';
+  pdfContainer.style.background = '#ffffff';
+
+  let itemsHtml = filteredEvents.slice(0, 15).map(e => `
+    <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <span style="font-size: 11px; font-weight: 800; color: #2563eb; text-transform: uppercase;">${translateCategory(e.category)}</span>
+        <span style="font-size: 11px; font-weight: 700; color: #64748b;">🏰 ${e.town}</span>
+      </div>
+      <h3 style="margin: 0 0 4px 0; font-size: 16px; color: #0f172a;">${e.title}</h3>
+      <div style="font-size: 12px; color: #475569; margin-bottom: 4px;">
+        <span>📅 ${getEventDateLabel(e)} · ${e.time || ''}</span> | <span>🗺️ ${e.venue}</span>
+      </div>
+      <p style="font-size: 12px; color: #64748b; margin: 0; line-height: 1.4;">${(e.description || '').substring(0, 150)}...</p>
+    </div>
+  `).join('');
+
+  pdfContainer.innerHTML = `
+    <div style="display:flex; align-items:center; gap:12px; border-bottom:2px solid #2563eb; padding-bottom:12px; margin-bottom:16px;">
+      <img src="assets/logo.jpg" style="height:44px; width:44px; border-radius:10px;" alt="Logo">
+      <div>
+        <h2 style="margin:0; font-size:20px; color:#0f172a;">Ciudad Viva — ${t('pdf_title')}</h2>
+        <p style="margin:2px 0 0; font-size:12px; color:#64748b;">${selectedTownName} · ${t('pdf_generated')} ${nowStr}</p>
+      </div>
+    </div>
+    <div>${itemsHtml || '<p>No hay eventos disponibles.</p>'}</div>
+    <div style="text-align:center; margin-top:20px; font-size:11px; color:#94a3b8;">
+      Ciudad Viva © https://ciudad-viva-1c19f.web.app
+    </div>
+  `;
+
+  const opt = {
+    margin: 10,
+    filename: `Agenda_Ciudad_Viva_${selectedTownName.replace(/\s+/g, '_')}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(pdfContainer).save();
+}
+
+function setupViewAndExportListeners() {
+  const btnList = $('#view-mode-list');
+  const btnMap = $('#view-mode-map');
+  const cardsEl = $('#cards');
+  const mapWrap = $('#events-map-wrap');
+
+  if (btnList && btnMap) {
+    btnList.onclick = () => {
+      activeViewMode = 'list';
+      btnList.classList.add('active');
+      btnMap.classList.remove('active');
+      if (cardsEl) cardsEl.style.display = 'grid';
+      if (mapWrap) mapWrap.style.display = 'none';
+    };
+
+    btnMap.onclick = () => {
+      activeViewMode = 'map';
+      btnMap.classList.add('active');
+      btnList.classList.remove('active');
+      if (cardsEl) cardsEl.style.display = 'none';
+      if (mapWrap) {
+        mapWrap.style.display = 'block';
+        setTimeout(() => {
+          if (leafletMap) leafletMap.invalidateSize();
+          initOrUpdateMap(getFilteredEvents());
+        }, 200);
+      }
+    };
+  }
+
+  const btnExportPdf = $('#btn-export-pdf');
+  if (btnExportPdf) {
+    btnExportPdf.onclick = () => {
+      exportFilteredEventsPDF(getFilteredEvents());
+    };
+  }
+}
+
+function checkUrlParamsForEvent() {
+  const params = new URLSearchParams(window.location.search);
+  const eventId = params.get('event');
+  if (eventId && events.length > 0) {
+    const targetEvent = events.find(e => e.id === eventId);
+    if (targetEvent) {
+      setTimeout(() => openDetail(eventId), 300);
+    }
+  }
+}
+
+// Renderizar tarjetas de la vista ciudadana
+function draw() {
+  updateFavsBadge();
+  const favsList = getFavorites();
+  const shown = getFilteredEvents();
 
   const countEl = $('#count');
   if (countEl) countEl.textContent = shown.length + ' actividades';
+
+  if (activeViewMode === 'map') {
+    initOrUpdateMap(shown);
+  }
 
   const cardsEl = $('#cards');
   if (cardsEl) {
@@ -722,8 +952,23 @@ function getGoogleMapsUrl(venue, town, locObj) {
   return `https://www.google.com/maps/search/?api=1&query=${searchQuery}`;
 }
 
+function getGoogleStreetViewUrl(venue, town, locObj) {
+  if (locObj && locObj.streetViewUrl && locObj.streetViewUrl.trim() !== '') {
+    return locObj.streetViewUrl.trim();
+  }
+  if (locObj && locObj.lat && locObj.lng) {
+    return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${locObj.lat},${locObj.lng}`;
+  }
+  const queryParts = [];
+  if (venue) queryParts.push(venue);
+  if (town) queryParts.push(town);
+  const query = encodeURIComponent(queryParts.join(', '));
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
   const locObj = locations.find(loc => getLocationDisplayName(loc) === e.venue || loc.name === e.venue);
   const mapsUrl = getGoogleMapsUrl(e.venue, e.town, locObj);
+  const streetViewUrl = getGoogleStreetViewUrl(e.venue, e.town, locObj);
   
   if ($('#dwhere')) {
     $('#dwhere').textContent = e.venue;
@@ -774,7 +1019,10 @@ function getGoogleMapsUrl(venue, town, locObj) {
 
   const linksEl = $('#modal-links');
   if (linksEl) {
+    const isEn = getLang() === 'en';
     let linksHtml = `<a href="${mapsUrl}" target="_blank" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;">${t('maps_link')}</a>`;
+    linksHtml += `<a href="${streetViewUrl}" target="_blank" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;">📷 ${isEn ? 'Open Google Street View 360° ↗' : 'Ver en Google Street View 360° ↗'}</a>`;
+
     if (e.linkFacebook) {
       linksHtml += `<a href="${e.linkFacebook}" target="_blank">${t('fb_link')}</a>`;
     }
@@ -928,4 +1176,7 @@ if (btnEn) {
 updateDOMTranslations();
 
 // Carga inicial
-Promise.all([loadTowns(), loadLocations(), loadEvents(), loadCategories()]);
+Promise.all([loadTowns(), loadLocations(), loadEvents(), loadCategories()]).then(() => {
+  setupViewAndExportListeners();
+  checkUrlParamsForEvent();
+});

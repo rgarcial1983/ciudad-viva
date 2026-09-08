@@ -4,13 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#2563eb">
-  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/jpeg" href="icons/favicon.jpg">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 <main class="app">
@@ -76,11 +78,27 @@
       </div>
     </div>
 
-    <div class="section-title">
-      <h3>Agenda disponible</h3>
-      <span id="count" class="muted"></span>
+    <div class="section-title" style="flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <h3 data-i18n="section_title">Agenda disponible</h3>
+        <span id="count" class="muted"></span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div class="view-toggle-tabs" style="display:inline-flex; background:#e2e8f0; padding:3px; border-radius:10px; gap:2px;">
+          <button id="view-mode-list" class="v-tab active" data-i18n="view_list">📋 Lista</button>
+          <button id="view-mode-map" class="v-tab" data-i18n="view_map">🗺️ Mapa</button>
+        </div>
+
+        <button id="btn-export-pdf" class="btn-secondary" style="padding:7px 14px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" title="Exportar agenda filtrada en PDF" data-i18n="btn_export_pdf">📄 Exportar PDF</button>
+      </div>
     </div>
     
+    <!-- Contenedor Mapa Interactivo -->
+    <div id="events-map-wrap" style="display:none; margin-bottom:24px; border-radius:16px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 4px 14px rgba(0,0,0,0.06); height:440px; width:100%; position:relative;">
+      <div id="events-map" style="height:100%; width:100%;"></div>
+    </div>
+
     <div id="cards" class="cards"></div>
     <div id="scroll-sentinel" style="text-align:center; padding:32px 16px; color:#64748b; font-weight:600; font-size:14px;">
       <span id="sentinel-text">Cargando eventos...</span>

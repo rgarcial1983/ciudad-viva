@@ -38,7 +38,19 @@ const translations = {
     town_modal_events: "Eventos programados",
     town_modal_venues: "Espacios culturales",
     town_modal_btn: "Filtrar agenda por este municipio",
-    no_events: "No se encontraron eventos con los filtros seleccionados."
+    no_events: "No se encontraron eventos con los filtros seleccionados.",
+    section_title: "Agenda disponible",
+    view_list: "📋 Lista",
+    view_map: "🗺️ Mapa",
+    btn_export_pdf: "📄 Exportar PDF",
+    pdf_title: "Programa Cultural y Agenda de Ocio",
+    pdf_generated: "Generado el",
+    share_modal_title: "Compartir Evento",
+    share_ws: "📲 Compartir por WhatsApp",
+    share_tg: "✈️ Compartir por Telegram",
+    share_x: "🈁 Compartir en X (Twitter)",
+    share_copy: "📋 Copiar Enlace Directo",
+    share_copied: "¡Enlace copiado al portapapeles!"
   },
   en: {
     brand_subtitle: "Cultural agenda & leisure activities in the region",
@@ -77,7 +89,19 @@ const translations = {
     town_modal_events: "Scheduled events",
     town_modal_venues: "Cultural venues",
     town_modal_btn: "Filter agenda for this town",
-    no_events: "No events found matching the selected filters."
+    no_events: "No events found matching the selected filters.",
+    section_title: "Available Agenda",
+    view_list: "📋 List",
+    view_map: "🗺️ Map",
+    btn_export_pdf: "📄 Export PDF",
+    pdf_title: "Cultural Program & Leisure Agenda",
+    pdf_generated: "Generated on",
+    share_modal_title: "Share Event",
+    share_ws: "📲 Share via WhatsApp",
+    share_tg: "✈️ Share via Telegram",
+    share_x: "🈁 Share on X (Twitter)",
+    share_copy: "📋 Copy Direct Link",
+    share_copied: "Link copied to clipboard!"
   }
 };
 
