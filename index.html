@@ -19,34 +19,44 @@
       <img src="assets/logo.jpg" alt="Ciudad Viva Logo" style="height:68px; width:68px; border-radius:14px; object-fit:contain; background:#ffffff; padding:2px; box-shadow:0 3px 10px rgba(0,0,0,0.1); border:1px solid rgba(226,232,240,0.8);">
       <div>
         <h1 style="margin:0; font-size:24px; font-weight:800;">Ciudad Viva</h1>
-        <p style="margin:2px 0 0; font-size:13px; color:var(--text-muted);">Agenda cultural y planes de ocio en la comarca</p>
+        <p style="margin:2px 0 0; font-size:13px; color:var(--text-muted);" data-i18n="brand_subtitle">Agenda cultural y planes de ocio en la comarca</p>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
-      <button id="pwa-install-btn" class="btn-primary" style="padding:8px 14px; gap:6px; display:inline-flex; align-items:center; background:#2563eb; color:#ffffff; border:0; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" title="Instalar aplicación en tu dispositivo">📲 Instalar App</button>
-      <button id="theme-toggle" class="btn-secondary" style="padding:8px 14px;" title="Cambiar tema">🌙 Modo Oscuro</button>
+    <div class="header-actions" style="display:flex; align-items:center; gap:8px;">
+      <div class="lang-flag-toggle" aria-label="Cambiar idioma / Switch language">
+        <button id="lang-btn-es" class="flag-btn active" title="Cambiar a Español">
+          <img src="assets/flag-es.png" alt="Español" class="flag-img">
+          <span>ES</span>
+        </button>
+        <button id="lang-btn-en" class="flag-btn" title="Switch to English">
+          <img src="assets/flag-en.png" alt="English" class="flag-img">
+          <span>EN</span>
+        </button>
+      </div>
+      <button id="pwa-install-btn" class="btn-primary" style="padding:8px 14px; gap:6px; display:inline-flex; align-items:center; background:#2563eb; color:#ffffff; border:0; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" title="Instalar aplicación en tu dispositivo" data-i18n="btn_install">📲 Instalar App</button>
+      <button id="theme-toggle" class="btn-secondary" style="padding:8px 14px;" title="Cambiar tema" data-i18n="theme_dark">🌙 Modo Oscuro</button>
     </div>
   </header>
 
   <!-- Vista Ciudadana -->
   <section id="citizen" class="view on">
     <div class="catalog-header">
-      <h2>¿Qué hacer hoy?</h2>
-      <p>Descubre eventos, rutas, conciertos y actividades programadas para los próximos días.</p>
+      <h2 data-i18n="hero_title">¿Qué hacer hoy?</h2>
+      <p data-i18n="hero_subtitle">Descubre eventos, rutas, conciertos y actividades programadas para los próximos días.</p>
 
       <div class="filter-bar">
         <div class="filter-row-top">
           <div class="search-wrap">
-            <input id="search" placeholder="Buscar por título, temática o artista...">
+            <input id="search" data-i18n-placeholder="search_placeholder" placeholder="Buscar por título, temática o artista...">
           </div>
           <select id="town" class="filter-select">
-            <option value="">Todos los municipios</option>
+            <option value="" data-i18n="all_towns">Todos los municipios</option>
           </select>
           <select id="date" class="filter-select">
-            <option value="">🗓️ Todas las fechas</option>
-            <option value="today">☀️ Hoy</option>
-            <option value="tomorrow">🌤️ Mañana</option>
-            <option value="weekend">🎉 Este Fin de Semana</option>
+            <option value="" data-i18n="all_dates">🗓️ Todas las fechas</option>
+            <option value="today" data-i18n="date_today">☀️ Hoy</option>
+            <option value="tomorrow" data-i18n="date_tomorrow">🌤️ Mañana</option>
+            <option value="weekend" data-i18n="date_weekend">🎉 Este Fin de Semana</option>
             <option value="custom">📅 Elegir fecha...</option>
           </select>
           <input type="date" id="custom-date-picker" class="filter-select" style="display:none; max-width: 170px;">
@@ -105,7 +115,7 @@
         <div class="practical-card">
           <div class="p-icon">📅</div>
           <div>
-            <span class="p-label">Cuándo</span>
+            <span class="p-label" data-i18n="modal_when">Cuándo</span>
             <span id="dwhen" class="p-val"></span>
           </div>
         </div>
@@ -113,7 +123,7 @@
         <div class="practical-card">
           <div class="p-icon">🗺️</div>
           <div>
-            <span class="p-label">Dónde</span>
+            <span class="p-label" data-i18n="modal_where">Dónde</span>
             <div id="dwhere" class="p-val"></div>
           </div>
         </div>
@@ -121,13 +131,13 @@
 
       <!-- Descripción -->
       <div class="modal-desc-box">
-        <h4 style="margin:0 0 8px 0; font-size:13px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Sobre la actividad</h4>
+        <h4 style="margin:0 0 8px 0; font-size:13px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;" data-i18n="modal_about">Sobre la actividad</h4>
         <p id="ddesc" style="margin:0; line-height:1.6; font-size:15px;"></p>
       </div>
 
       <!-- Ficha Enriquecida del Espacio -->
       <div id="modal-venue-info" class="modal-venue-info-box" style="display:none;">
-        <h4 style="margin:0 0 10px 0; font-size:13px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">Información del Espacio / Recinto</h4>
+        <h4 style="margin:0 0 10px 0; font-size:13px; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;" data-i18n="modal_venue_info">Información del Espacio / Recinto</h4>
         <div id="venue-info-details" class="venue-details-list"></div>
       </div>
       

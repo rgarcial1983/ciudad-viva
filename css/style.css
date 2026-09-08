@@ -731,6 +731,42 @@ button { font-family: inherit; }
   .stats { grid-template-columns: repeat(2, 1fr); }
   .filter-row-top { flex-direction: column; }
   .search-wrap, .filter-select { width: 100%; }
+
+  /* Layout Responsive de Cabecera en Móviles */
+  .top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+  .brand img {
+    height: 48px !important;
+    width: 48px !important;
+    border-radius: 12px !important;
+  }
+  .brand h1 {
+    font-size: 20px !important;
+  }
+  .brand p {
+    display: none;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+  }
+  .header-actions .lang-flag-toggle {
+    flex: 1;
+    justify-content: center;
+  }
+  .header-actions #pwa-install-btn,
+  .header-actions #theme-toggle {
+    padding: 7px 10px !important;
+    font-size: 13px !important;
+    white-space: nowrap;
+  }
   
   /* Optimización Modal Detalle en Móvil */
   .detail {
@@ -796,4 +832,74 @@ button { font-family: inherit; }
 
   .lb-prev { left: 10px; }
   .lb-next { right: 10px; }
+}
+
+/* Conmutador de Idioma con Banderas Circulares HD */
+.lang-flag-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: #e2e8f0;
+  padding: 4px;
+  border-radius: 30px;
+  gap: 4px;
+  border: 1px solid #cbd5e1;
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.flag-btn {
+  border: 0;
+  background: transparent;
+  padding: 4px 10px 4px 5px;
+  border-radius: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #64748b;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.flag-btn .flag-img {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.flag-btn:hover .flag-img {
+  transform: scale(1.1);
+}
+
+.flag-btn:hover {
+  color: #0f172a;
+}
+
+.flag-btn.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="dark"] .lang-flag-toggle {
+  background: #0f172a;
+  border-color: #334155;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .flag-btn {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .flag-btn:hover {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .flag-btn.active {
+  background: #1e293b;
+  color: #60a5fa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }

@@ -1,6 +1,9 @@
 import { 
   db, eventsRef, locationsRef, townsRef, categoriesRef, getDocs 
 } from "./firebase-config.js";
+import {
+  getLang, setLang, toggleLang, t, translateCategory, translatePrice, updateDOMTranslations
+} from "./i18n.js";
 
 let selectedCategory = '';
 let events = [];
@@ -15,29 +18,43 @@ let observer = null;
 const $ = s => document.querySelector(s);
 
 function formatDateLabel(dateStr, dateEndStr = null) {
-  if (!dateStr) return 'Próximamente';
+  const isEn = getLang() === 'en';
+  if (!dateStr) return isEn ? 'Coming soon' : 'Próximamente';
   const cleanStart = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
   const dStart = new Date(cleanStart + 'T00:00:00');
   if (isNaN(dStart.getTime())) return dateStr;
 
-  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const daysEs = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const daysEn = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const monthsEs = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  const monthsEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const days = isEn ? daysEn : daysEs;
+  const months = isEn ? monthsEn : monthsEs;
 
   if (dateEndStr && dateEndStr.trim() !== '' && dateEndStr !== cleanStart) {
     const cleanEnd = dateEndStr.includes('T') ? dateEndStr.split('T')[0] : dateEndStr;
     const dEnd = new Date(cleanEnd + 'T00:00:00');
     if (!isNaN(dEnd.getTime()) && dEnd > dStart) {
       if (dStart.getMonth() === dEnd.getMonth() && dStart.getFullYear() === dEnd.getFullYear()) {
-        return `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+        return isEn 
+          ? `${months[dEnd.getMonth()]} ${dStart.getDate()} - ${dEnd.getDate()}`
+          : `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
       } else if (dStart.getFullYear() === dEnd.getFullYear()) {
-        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+        return isEn
+          ? `${months[dStart.getMonth()]} ${dStart.getDate()} - ${months[dEnd.getMonth()]} ${dEnd.getDate()}`
+          : `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
       } else {
-        return `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${dStart.getFullYear()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${dEnd.getFullYear()}`;
+        return isEn
+          ? `${months[dStart.getMonth()]} ${dStart.getDate()}, ${dStart.getFullYear()} - ${months[dEnd.getMonth()]} ${dEnd.getDate()}, ${dEnd.getFullYear()}`
+          : `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${dStart.getFullYear()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${dEnd.getFullYear()}`;
       }
     }
   }
 
-  return `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]}`;
+  return isEn
+    ? `${days[dStart.getDay()]}, ${months[dStart.getMonth()]} ${dStart.getDate()}`
+    : `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]}`;
 }
 
 function getEventDateLabel(e) {
@@ -329,13 +346,17 @@ function renderCategoryChips() {
   if (!chipsRow) return;
 
   const favCount = getFavorites().length;
+  const isEn = getLang() === 'en';
+  const allLabel = isEn ? 'All' : 'Todas';
+  const favsLabel = isEn ? 'Favorites' : 'Favoritos';
 
-  let html = `<button class="chip-item ${!selectedCategory && !showOnlyFavorites ? 'on' : ''}" data-cat="">Todas</button>`;
-  html += `<button class="chip-item chip-fav ${showOnlyFavorites ? 'on' : ''}" data-favs="true">❤️ Favoritos (<span id="favs-badge">${favCount}</span>)</button>`;
+  let html = `<button class="chip-item ${!selectedCategory && !showOnlyFavorites ? 'on' : ''}" data-cat="">${allLabel}</button>`;
+  html += `<button class="chip-item chip-fav ${showOnlyFavorites ? 'on' : ''}" data-favs="true">❤️ ${favsLabel} (<span id="favs-badge">${favCount}</span>)</button>`;
 
   html += categories.map(c => {
     const isOn = selectedCategory === c.name && !showOnlyFavorites;
-    return `<button class="chip-item ${isOn ? 'on' : ''}" data-cat="${c.name}">${c.icon || ''} ${c.name}</button>`;
+    const catDisplayName = translateCategory(c.name);
+    return `<button class="chip-item ${isOn ? 'on' : ''}" data-cat="${c.name}">${c.icon || ''} ${catDisplayName}</button>`;
   }).join('');
 
   chipsRow.innerHTML = html;
@@ -437,7 +458,7 @@ function draw() {
   updateFavsBadge();
   const favsList = getFavorites();
   let q = ($('#search') ? $('#search').value : '').toLowerCase();
-  let t = ($('#town') ? $('#town').value : '');
+  let selectedTown = ($('#town') ? $('#town').value : '');
   let dateVal = ($('#date') ? $('#date').value : '');
   let customDateVal = ($('#custom-date-picker') ? $('#custom-date-picker').value : '');
 
@@ -445,7 +466,7 @@ function draw() {
     e.title.toLowerCase().includes(q) &&
     (showOnlyFavorites ? favsList.includes(e.id) : true) &&
     (!selectedCategory || e.category === selectedCategory) &&
-    (!t || e.town === t) &&
+    (!selectedTown || e.town === selectedTown) &&
     matchesDateFilter(e, dateVal, customDateVal)
   );
 
@@ -476,8 +497,8 @@ function draw() {
         const coverUrl = photos[primaryIndex] || photos[0];
         const hasImg = !!coverUrl;
         const bgStyle = hasImg ? `background-image:url('${coverUrl}');` : 'background:#e2e8f0;';
-        const galleryBadge = photos.length > 1 ? `<span class="badge-gallery">${photos.length} fotos</span>` : '';
-        const featuredBadge = e.featured ? `<span class="badge-featured" style="position:absolute; bottom:12px; left:12px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; font-size:11px; font-weight:800; padding:3px 9px; border-radius:20px; z-index:2; box-shadow:0 2px 6px rgba(0,0,0,0.2);">⭐ Destacado</span>` : '';
+        const galleryBadge = photos.length > 1 ? `<span class="badge-gallery">${photos.length} ${getLang() === 'en' ? 'photos' : 'fotos'}</span>` : '';
+        const featuredBadge = e.featured ? `<span class="badge-featured" style="position:absolute; bottom:12px; left:12px; background:linear-gradient(135deg, #f59e0b, #d97706); color:white; font-size:11px; font-weight:800; padding:3px 9px; border-radius:20px; z-index:2; box-shadow:0 2px 6px rgba(0,0,0,0.2);">${t('badge_featured')}</span>` : '';
         const isFree = (e.price || '').toLowerCase().includes('gratis');
         const isFav = favsList.includes(e.id);
 
@@ -485,23 +506,23 @@ function draw() {
           <article class="card ${e.featured ? 'card-featured' : ''}">
             <div class="visual" style="${bgStyle}">
               <span class="pill-time">${getEventDateLabel(e)} · ${e.time || ''}</span>
-              <button class="btn-fav ${isFav ? 'is-fav' : ''}" title="${isFav ? 'Quitar de favoritos' : 'Guardar en favoritos'}" onclick="toggleFavorite('${e.id}', event)">
+              <button class="btn-fav ${isFav ? 'is-fav' : ''}" title="${isFav ? (getLang() === 'en' ? 'Remove from favorites' : 'Quitar de favoritos') : (getLang() === 'en' ? 'Save to favorites' : 'Guardar en favoritos')}" onclick="toggleFavorite('${e.id}', event)">
                 ${isFav ? '❤️' : '🤍'}
               </button>
               ${featuredBadge}
               ${galleryBadge}
-              <span style="cursor:pointer;" onclick="openTownModal('${e.town}')" title="Ver información de ${e.town}">🏰 ${e.town}</span>
+              <span style="cursor:pointer;" onclick="openTownModal('${e.town}')" title="${getLang() === 'en' ? 'View info for' : 'Ver información de'} ${e.town}">🏰 ${e.town}</span>
             </div>
             <div class="card-body">
               <div class="card-meta">
-                <span class="tag-category">${e.category}</span>
-                <span class="price-tag ${isFree ? '' : 'paid'}">${e.price}</span>
+                <span class="tag-category">${translateCategory(e.category)}</span>
+                <span class="price-tag ${isFree ? '' : 'paid'}">${translatePrice(e.price)}</span>
               </div>
               <h4>${e.title}</h4>
               <p class="venue">🗺️ ${e.venue}</p>
               <div class="card-footer">
                 <span class="muted">${getEventDateLabel(e)}</span>
-                <button class="btn-detail" onclick="openDetail('${e.id}')">Ver detalle →</button>
+                <button class="btn-detail" onclick="openDetail('${e.id}')">${t('btn_detail')}</button>
               </div>
             </div>
           </article>
@@ -678,7 +699,7 @@ window.openDetail = function(id) {
   let e = events.find(ev => ev.id === id);
   if(!e) return;
 
-  if ($('#dtag')) $('#dtag').textContent = e.category;
+  if ($('#dtag')) $('#dtag').textContent = translateCategory(e.category);
   if ($('#dtitle')) $('#dtitle').textContent = e.title;
   if ($('#ddesc')) $('#ddesc').textContent = e.description;
   if ($('#dwhen')) $('#dwhen').textContent = getEventDateLabel(e) + ' · ' + e.time;
@@ -686,7 +707,7 @@ window.openDetail = function(id) {
   const isFree = (e.price || '').toLowerCase().includes('gratis');
   const priceBadge = $('#dprice-badge');
   if (priceBadge) {
-    priceBadge.textContent = e.price;
+    priceBadge.textContent = translatePrice(e.price);
     priceBadge.className = `price-tag ${isFree ? '' : 'paid'}`;
   }
 
@@ -711,11 +732,12 @@ function getGoogleMapsUrl(venue, town, locObj) {
   const venueBox = $('#modal-venue-info');
   const venueDetailsEl = $('#venue-info-details');
   if (venueBox && venueDetailsEl) {
+    const isEn = getLang() === 'en';
     let detailsHtml = '';
     if (locObj) {
-      if (locObj.address) detailsHtml += `<div>📍 <b>Dirección:</b> ${locObj.address}</div>`;
-      if (locObj.capacity) detailsHtml += `<div>👥 <b>Aforo máximo:</b> ${locObj.capacity}</div>`;
-      if (locObj.phone) detailsHtml += `<div>📞 <b>Contacto / Taquilla:</b> ${locObj.phone}</div>`;
+      if (locObj.address) detailsHtml += `<div>📍 <b>${isEn ? 'Address' : 'Dirección'}:</b> ${locObj.address}</div>`;
+      if (locObj.capacity) detailsHtml += `<div>👥 <b>${isEn ? 'Max capacity' : 'Aforo máximo'}:</b> ${locObj.capacity}</div>`;
+      if (locObj.phone) detailsHtml += `<div>📞 <b>${isEn ? 'Contact / Box office' : 'Contacto / Taquilla'}:</b> ${locObj.phone}</div>`;
     }
     if (detailsHtml) {
       venueDetailsEl.innerHTML = detailsHtml;
@@ -727,35 +749,37 @@ function getGoogleMapsUrl(venue, town, locObj) {
 
   const btnCal = $('#btn-add-calendar');
   if (btnCal) {
+    btnCal.textContent = t('modal_calendar');
     btnCal.onclick = () => showAddToCalendarDialog(e);
   }
 
   const btnFavDetail = $('#btn-fav-detail');
   if (btnFavDetail) {
     const favCurrently = isFavorite(e.id);
-    btnFavDetail.innerHTML = favCurrently ? '❤️ En favoritos' : '🤍 Guardar';
+    btnFavDetail.innerHTML = favCurrently ? t('modal_favorite_active') : t('modal_favorite');
     btnFavDetail.className = `btn-secondary ${favCurrently ? 'is-fav-active' : ''}`;
     btnFavDetail.onclick = () => {
       toggleFavorite(e.id);
       const isNowFav = isFavorite(e.id);
-      btnFavDetail.innerHTML = isNowFav ? '❤️ En favoritos' : '🤍 Guardar';
+      btnFavDetail.innerHTML = isNowFav ? t('modal_favorite_active') : t('modal_favorite');
       btnFavDetail.className = `btn-secondary ${isNowFav ? 'is-fav-active' : ''}`;
     };
   }
 
   const btnShare = $('#btn-share-event');
   if (btnShare) {
+    btnShare.textContent = t('modal_share');
     btnShare.onclick = () => shareEvent(e);
   }
 
   const linksEl = $('#modal-links');
   if (linksEl) {
-    let linksHtml = `<a href="${mapsUrl}" target="_blank" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;">📍 Abrir ubicación en Google Maps ↗</a>`;
+    let linksHtml = `<a href="${mapsUrl}" target="_blank" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;">${t('maps_link')}</a>`;
     if (e.linkFacebook) {
-      linksHtml += `<a href="${e.linkFacebook}" target="_blank">📘 Publicación en Facebook ↗</a>`;
+      linksHtml += `<a href="${e.linkFacebook}" target="_blank">${t('fb_link')}</a>`;
     }
     if (e.linkWeb) {
-      linksHtml += `<a href="${e.linkWeb}" target="_blank">🌐 Web Oficial / Venta de Entradas ↗</a>`;
+      linksHtml += `<a href="${e.linkWeb}" target="_blank">${t('web_link')}</a>`;
     }
     linksEl.innerHTML = linksHtml;
   }
@@ -884,10 +908,24 @@ if (lightboxEl) {
   lightboxEl.onclick = (e) => { if (e.target === lightboxEl) closeLightbox(); };
 }
 
-const detailEl = $('#detail');
-if (detailEl) {
-  detailEl.onclick = e => { if (e.target === detailEl) closeDetail(); };
+const btnEs = $('#lang-btn-es');
+const btnEn = $('#lang-btn-en');
+if (btnEs) {
+  btnEs.onclick = () => {
+    setLang('es');
+    renderCategoryChips();
+    draw();
+  };
 }
+if (btnEn) {
+  btnEn.onclick = () => {
+    setLang('en');
+    renderCategoryChips();
+    draw();
+  };
+}
+
+updateDOMTranslations();
 
 // Carga inicial
 Promise.all([loadTowns(), loadLocations(), loadEvents(), loadCategories()]);
