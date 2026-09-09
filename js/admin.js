@@ -1121,6 +1121,7 @@ function resetEventForm() {
   if ($('#new-desc')) $('#new-desc').value = '';
   if ($('#new-link-fb')) $('#new-link-fb').value = '';
   if ($('#new-link-web')) $('#new-link-web').value = '';
+  if ($('#photo-url-input')) $('#photo-url-input').value = '';
 
   uploadedPhotos = [];
   renderThumbs();
@@ -1196,12 +1197,52 @@ if ($('#save')) {
 }
 
 // ----------------------------------------------------
-// SUBIDA DE FOTOS Y COMPRESIÓN EN CANVAS
+// SUBIDA DE FOTOS Y COMPRESIÓN EN CANVAS / AÑADIR POR URL
 // ----------------------------------------------------
 const dropZone = $('#drop-zone');
 const fileInput = $('#poster-input');
 const thumbsContainer = $('#thumbs-container');
 const slotsInfo = $('#slots-info');
+const photoUrlInput = $('#photo-url-input');
+const btnAddPhotoUrl = $('#btn-add-photo-url');
+
+function addPhotoFromUrl() {
+  if (!photoUrlInput) return;
+  const url = photoUrlInput.value.trim();
+  if (!url) {
+    return notifyWarning('Por favor, introduce una URL de imagen válida.');
+  }
+  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:image/')) {
+    return notifyWarning('La URL debe empezar por http:// o https://');
+  }
+  if (uploadedPhotos.length >= 3) {
+    return notifyWarning('Máximo 3 imágenes por evento.');
+  }
+
+  uploadedPhotos.push({
+    url: url,
+    isPrimary: uploadedPhotos.length === 0
+  });
+  photoUrlInput.value = '';
+  renderThumbs();
+  notifySuccess('Imagen añadida mediante URL.');
+}
+
+if (btnAddPhotoUrl) {
+  btnAddPhotoUrl.addEventListener('click', (e) => {
+    e.preventDefault();
+    addPhotoFromUrl();
+  });
+}
+
+if (photoUrlInput) {
+  photoUrlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addPhotoFromUrl();
+    }
+  });
+}
 
 if (dropZone) {
   dropZone.addEventListener('click', () => { if (uploadedPhotos.length < 3) fileInput.click(); });
