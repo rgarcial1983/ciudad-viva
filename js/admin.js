@@ -796,6 +796,7 @@ function renderAdminEvents() {
           <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${getEventDateLabel(e)} · ${e.time}) · <b>${e.town}</b></span>
         </div>
         <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;" onclick="openSocialShareModal('${e.id}')">📱 Difundir RRSS</button>
           <button class="btn-action-edit" onclick="editEvent('${e.id}')">✏️ Editar</button>
           <button class="btn-action-delete" onclick="deleteEvent('${e.id}')">🗑️ Eliminar</button>
         </div>
@@ -1353,11 +1354,20 @@ function renderUsers() {
       ? `<span style="background:#dbeafe; color:#1e40af; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Superadmin</span>` 
       : `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:12px; font-weight:600;">Gestor Municipal</span>`;
 
+    let socialInfo = '';
+    if (u.facebookPage || u.twitterHandle || u.instagramHandle) {
+      const parts = [];
+      if (u.facebookPage) parts.push(`📘 <a href="${u.facebookPage}" target="_blank" style="color:#2563eb;">FB</a>`);
+      if (u.twitterHandle) parts.push(`🐤 ${u.twitterHandle}`);
+      if (u.instagramHandle) parts.push(`📸 ${u.instagramHandle}`);
+      socialInfo = `<br><span class="muted" style="font-size:12px;">RRSS: ${parts.join(' · ')}</span>`;
+    }
+
     return `
       <div class="admin-list-item">
         <div>
           <b style="font-size:15px;">${u.email || 'Sin email'}</b> ${roleBadge}<br>
-          <span class="muted" style="font-size:13px;">Municipios autorizados: <b>${townsLabel}</b></span>
+          <span class="muted" style="font-size:13px;">Municipios autorizados: <b>${townsLabel}</b></span>${socialInfo}
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn-action-edit" onclick="editUserPermissions('${u.id}')">⚙️ Editar Permisos</button>
@@ -1381,9 +1391,9 @@ function renderUserTownCheckboxes(selectedTowns = []) {
   wrap.innerHTML = towns.map(t => {
     const isChecked = selectedTowns.includes('*') || selectedTowns.includes(t.name);
     return `
-      <label style="display:flex; align-items:center; gap:8px; font-size:14px; font-weight:normal; cursor:pointer;">
-        <input type="checkbox" class="user-town-cb" value="${t.name}" ${isChecked ? 'checked' : ''}>
-        ${t.name}
+      <label style="display:flex; align-items:center; justify-content:flex-start; gap:10px; font-size:14px; font-weight:normal; cursor:pointer; width:fit-content; padding:2px 0;">
+        <input type="checkbox" class="user-town-cb" value="${t.name}" ${isChecked ? 'checked' : ''} style="width:auto; margin:0; flex-shrink:0;">
+        <span>${t.name}</span>
       </label>
     `;
   }).join('');
@@ -1396,6 +1406,10 @@ window.editUserPermissions = (uid) => {
   $('#user-edit-uid').value = u.id || u.uid;
   $('#user-edit-email').value = u.email || '';
   $('#user-edit-role').value = u.role || 'editor';
+
+  if ($('#user-edit-fb')) $('#user-edit-fb').value = u.facebookPage || '';
+  if ($('#user-edit-tw')) $('#user-edit-tw').value = u.twitterHandle || '';
+  if ($('#user-edit-ig')) $('#user-edit-ig').value = u.instagramHandle || '';
 
   renderUserTownCheckboxes(u.allowedTowns || []);
   toggleTownsGroupVisibility();
@@ -1434,20 +1448,30 @@ if ($('#save-user-permissions')) {
       }
     }
 
+    const fbVal = $('#user-edit-fb') ? $('#user-edit-fb').value.trim() : '';
+    const twVal = $('#user-edit-tw') ? $('#user-edit-tw').value.trim() : '';
+    const igVal = $('#user-edit-ig') ? $('#user-edit-ig').value.trim() : '';
+
     try {
       $('#save-user-permissions').disabled = true;
       $('#save-user-permissions').textContent = "Guardando...";
 
       await updateDoc(doc(db, "users", uid), {
         role: role,
-        allowedTowns: allowedTowns
+        allowedTowns: allowedTowns,
+        facebookPage: fbVal,
+        twitterHandle: twVal,
+        instagramHandle: igVal
       });
 
-      notifySuccess('Permisos de usuario actualizados con éxito.');
+      notifySuccess('Permisos y perfil social actualizados con éxito.');
 
       if (currentUserProfile && (currentUserProfile.uid === uid || currentUserProfile.id === uid)) {
         currentUserProfile.role = role;
         currentUserProfile.allowedTowns = allowedTowns;
+        currentUserProfile.facebookPage = fbVal;
+        currentUserProfile.twitterHandle = twVal;
+        currentUserProfile.instagramHandle = igVal;
         updateUserRoleUI();
       }
 
@@ -1718,6 +1742,84 @@ window.prevLightboxPhoto = () => {
 window.nextLightboxPhoto = () => {
   currentLightboxIdx = (currentLightboxIdx + 1) % activeGalleryPhotos.length;
   updateLightbox();
+};
+
+window.openSocialShareModal = (eventId) => {
+  const e = events.find(item => item.id === eventId);
+  if (!e) return;
+
+  const modal = $('#social-share-modal');
+  const textarea = $('#social-post-textarea');
+  if (!modal || !textarea) return;
+
+  const townHashtag = '#' + (e.town || 'CiudadViva').replace(/\s+/g, '');
+  const catHashtag = '#' + (e.category || 'Cultura').replace(/\s+/g, '');
+  const shareUrl = `${window.location.origin}/?event=${e.id}`;
+
+  const dateLabel = getEventDateLabel(e);
+  const timeLabel = e.time || '20:00 h';
+
+  const postText = `🎭 ${e.title}
+📅 ${dateLabel} a las ${timeLabel}
+🏰 ${e.town} · 📍 ${e.venue}
+🎟️ Entrada: ${e.price || 'Gratis'}
+
+${(e.description || '').slice(0, 180)}${(e.description || '').length > 180 ? '...' : ''}
+
+🔗 Más detalles y ubicación en Ciudad Viva:
+${shareUrl}
+
+${townHashtag} ${catHashtag} #AgendaCultural #CiudadViva #Festejos`;
+
+  textarea.value = postText;
+
+  const encodedText = encodeURIComponent(postText);
+  const encodedUrl = encodeURIComponent(shareUrl);
+
+  const btnFb = $('#btn-social-fb');
+  const btnTw = $('#btn-social-tw');
+  const btnWa = $('#btn-social-wa');
+  const btnTg = $('#btn-social-tg');
+
+  if (btnFb) {
+    let fbTarget = 'https://www.facebook.com/sharer/sharer.php?u=' + encodedUrl;
+    if (currentUserProfile && currentUserProfile.facebookPage && currentUserProfile.facebookPage.trim() !== '') {
+      fbTarget = currentUserProfile.facebookPage.trim();
+    }
+    btnFb.href = fbTarget;
+  }
+  if (btnTw) {
+    let twText = `🎭 ${e.title}\n📅 ${dateLabel}\n🏰 ${e.town}\n${shareUrl}`;
+    if (currentUserProfile && currentUserProfile.twitterHandle) {
+      twText += ` via ${currentUserProfile.twitterHandle}`;
+    }
+    btnTw.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(twText)}`;
+  }
+  if (btnWa) {
+    btnWa.href = `https://api.whatsapp.com/send?text=${encodedText}`;
+  }
+  if (btnTg) {
+    btnTg.href = `https://t.me/share/url?url=${encodedUrl}&text=${encodeURIComponent('🎭 ' + e.title + '\n📅 ' + dateLabel)}`;
+  }
+
+  modal.style.display = 'flex';
+};
+
+window.closeSocialShareModal = () => {
+  const modal = $('#social-share-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.copySocialPostText = () => {
+  const textarea = $('#social-post-textarea');
+  if (!textarea) return;
+  textarea.select();
+  textarea.setSelectionRange(0, 99999);
+  navigator.clipboard.writeText(textarea.value).then(() => {
+    notifySuccess('¡Texto del post copiado al portapapeles!');
+  }).catch(() => {
+    notifySuccess('Copiado al portapapeles');
+  });
 };
 
 // Carga Inicial de datos para Administración

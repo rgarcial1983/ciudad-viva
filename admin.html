@@ -176,6 +176,17 @@
                     <p class="muted" style="margin:0;">Cargando municipios...</p>
                   </div>
                 </div>
+
+                <!-- Perfiles Sociales de la Entidad -->
+                <div class="field-group" style="margin-top:14px; padding-top:12px; border-top:1px dashed #cbd5e1;">
+                  <label style="font-weight:700; color:#1e293b;">📱 Redes Sociales de la Entidad / Gestor (Opcional)</label>
+                  <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+                    <input type="url" id="user-edit-fb" placeholder="📘 URL Página de Facebook (https://facebook.com/...)" style="padding:8px 10px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; width:100%;">
+                    <input type="text" id="user-edit-tw" placeholder="🐤 Usuario de X/Twitter (ej. @CulturaUbeda)" style="padding:8px 10px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; width:100%;">
+                    <input type="text" id="user-edit-ig" placeholder="📸 Usuario de Instagram (ej. @cultura_ubeda)" style="padding:8px 10px; font-size:13px; border:1px solid #cbd5e1; border-radius:6px; width:100%;">
+                  </div>
+                </div>
+
                 <div style="display:flex; gap:10px; margin-top:12px;">
                   <button class="btn-primary" id="save-user-permissions">Guardar Permisos</button>
                   <button class="btn-secondary" id="cancel-user-edit" style="display:none;">Cancelar</button>
@@ -525,6 +536,52 @@
         <button class="btn-primary" id="btn-add-calendar">📅 Añadir a mi calendario</button>
         <button class="btn-secondary" id="btn-share-event">🔗 Compartir</button>
         <button class="btn-secondary" onclick="closeDetail()">Cerrar</button>
+      </div>
+    </div>
+  </article>
+</div>
+
+<!-- Modal Difusión en Redes Sociales -->
+<div id="social-share-modal" class="detail" style="display:none;">
+  <article class="modal modal-modern" style="max-width:540px; margin: auto;">
+    <button class="close-floating" onclick="closeSocialShareModal()" title="Cerrar">✕</button>
+    <div class="modal-body-content" style="padding:24px;">
+      <h3 style="margin:0 0 4px 0; font-size:20px; color:#0f172a; display:flex; align-items:center; gap:8px;">
+        📱 Difundir Evento en Redes Sociales
+      </h3>
+      <p class="muted" style="margin:0 0 16px 0; font-size:13px;">
+        Copia la publicación adaptada o abre directamente tu red social preferida para publicar o guardar como borrador.
+      </p>
+
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:6px;">
+          Texto formateado listo para publicar:
+        </label>
+        <textarea id="social-post-textarea" rows="7" style="width:100%; padding:12px; font-family:system-ui, sans-serif; font-size:14px; border:1px solid #cbd5e1; border-radius:10px; background:#f8fafc; line-height:1.5; color:#1e293b; resize:vertical; box-sizing:border-box;"></textarea>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <button type="button" class="btn-primary" onclick="copySocialPostText()" style="width:100%; justify-content:center; gap:8px; font-weight:700; background:#2563eb; color:white; border:none; padding:11px; border-radius:10px; cursor:pointer; font-size:14px;">
+          📋 Copiar Texto del Post
+        </button>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:4px;">
+          <a id="btn-social-fb" href="#" target="_blank" class="btn-secondary" style="display:flex; justify-content:center; align-items:center; gap:6px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700; padding:10px; border-radius:10px; text-decoration:none; text-align:center; font-size:13px;">
+            📘 Abrir Facebook
+          </a>
+          <a id="btn-social-tw" href="#" target="_blank" class="btn-secondary" style="display:flex; justify-content:center; align-items:center; gap:6px; background:#f8fafc; color:#0f172a; border:1px solid #e2e8f0; font-weight:700; padding:10px; border-radius:10px; text-decoration:none; text-align:center; font-size:13px;">
+            🐤 Abrir X (Twitter)
+          </a>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <a id="btn-social-wa" href="#" target="_blank" class="btn-secondary" style="display:flex; justify-content:center; align-items:center; gap:6px; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700; padding:10px; border-radius:10px; text-decoration:none; text-align:center; font-size:13px;">
+            💬 Compartir WhatsApp
+          </a>
+          <a id="btn-social-tg" href="#" target="_blank" class="btn-secondary" style="display:flex; justify-content:center; align-items:center; gap:6px; background:#f0f9ff; color:#0369a1; border:1px solid #bae6fd; font-weight:700; padding:10px; border-radius:10px; text-decoration:none; text-align:center; font-size:13px;">
+            ✈️ Compartir Telegram
+          </a>
+        </div>
       </div>
     </div>
   </article>
