@@ -679,6 +679,76 @@ function setupViewAndExportListeners() {
       exportFilteredEventsPDF(getFilteredEvents());
     };
   }
+
+  const btnNearMe = $('#btn-near-me');
+  if (btnNearMe) {
+    btnNearMe.onclick = () => handleNearMeClick();
+  }
+}
+
+function handleNearMeClick() {
+  if (!navigator.geolocation) {
+    alert(getLang() === 'en' ? 'Geolocation is not supported by your browser.' : 'La geolocalización no está soportada por tu navegador.');
+    return;
+  }
+
+  const btn = $('#btn-near-me');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${getLang() === 'en' ? 'Locating...' : 'Ubicando...'}`;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const userLat = pos.coords.latitude;
+      const userLng = pos.coords.longitude;
+
+      let minDistance = Infinity;
+      let nearestTown = null;
+
+      for (const [townName, coords] of Object.entries(TOWN_COORDINATES)) {
+        const dLat = userLat - coords.lat;
+        const dLng = userLng - coords.lng;
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (dist < minDistance) {
+          minDistance = dist;
+          nearestTown = townName;
+        }
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i> <span data-i18n="btn_near_me">${t('btn_near_me')}</span>`;
+      }
+
+      const townSelect = $('#town');
+      if (nearestTown && townSelect) {
+        townSelect.value = nearestTown;
+        draw();
+        const msg = getLang() === 'en'
+          ? `📍 Filtered by your nearest town: ${nearestTown}`
+          : `📍 Filtrando por tu municipio más cercano: ${nearestTown}`;
+        if (typeof Swal !== 'undefined') {
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'info',
+            title: msg,
+            showConfirmButton: false,
+            timer: 3000
+          });
+        }
+      }
+    },
+    (err) => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i> <span data-i18n="btn_near_me">${t('btn_near_me')}</span>`;
+      }
+      alert(getLang() === 'en' ? 'Could not retrieve your location. Please check location permissions.' : 'No se pudo obtener tu ubicación. Por favor, revisa los permisos de localización.');
+    },
+    { timeout: 8000 }
+  );
 }
 
 function checkUrlParamsForEvent() {
@@ -980,9 +1050,9 @@ function getGoogleStreetViewUrl(venue, town, locObj) {
     const isEn = getLang() === 'en';
     let detailsHtml = '';
     if (locObj) {
-      if (locObj.address) detailsHtml += `<div>📍 <b>${isEn ? 'Address' : 'Dirección'}:</b> ${locObj.address}</div>`;
-      if (locObj.capacity) detailsHtml += `<div>👥 <b>${isEn ? 'Max capacity' : 'Aforo máximo'}:</b> ${locObj.capacity}</div>`;
-      if (locObj.phone) detailsHtml += `<div>📞 <b>${isEn ? 'Contact / Box office' : 'Contacto / Taquilla'}:</b> ${locObj.phone}</div>`;
+      if (locObj.address) detailsHtml += `<div><i class="fa-solid fa-location-dot" style="color:var(--primary); margin-right:4px;"></i> <b>${isEn ? 'Address' : 'Dirección'}:</b> ${locObj.address}</div>`;
+      if (locObj.capacity) detailsHtml += `<div><i class="fa-solid fa-users" style="color:var(--primary); margin-right:4px;"></i> <b>${isEn ? 'Max capacity' : 'Aforo máximo'}:</b> ${locObj.capacity}</div>`;
+      if (locObj.phone) detailsHtml += `<div><i class="fa-solid fa-phone" style="color:var(--primary); margin-right:4px;"></i> <b>${isEn ? 'Contact / Box office' : 'Contacto / Taquilla'}:</b> ${locObj.phone}</div>`;
     }
     if (detailsHtml) {
       venueDetailsEl.innerHTML = detailsHtml;
@@ -994,7 +1064,7 @@ function getGoogleStreetViewUrl(venue, town, locObj) {
 
   const btnCal = $('#btn-add-calendar');
   if (btnCal) {
-    btnCal.textContent = t('modal_calendar');
+    btnCal.innerHTML = t('modal_calendar');
     btnCal.onclick = () => showAddToCalendarDialog(e);
   }
 
@@ -1013,7 +1083,7 @@ function getGoogleStreetViewUrl(venue, town, locObj) {
 
   const btnShare = $('#btn-share-event');
   if (btnShare) {
-    btnShare.textContent = t('modal_share');
+    btnShare.innerHTML = t('modal_share');
     btnShare.onclick = () => shareEvent(e);
   }
 
@@ -1021,7 +1091,7 @@ function getGoogleStreetViewUrl(venue, town, locObj) {
   if (linksEl) {
     const isEn = getLang() === 'en';
     let linksHtml = `<a href="${mapsUrl}" target="_blank" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-weight:700;">${t('maps_link')}</a>`;
-    linksHtml += `<a href="${streetViewUrl}" target="_blank" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;">📷 ${isEn ? 'Open Google Street View 360° ↗' : 'Ver en Google Street View 360° ↗'}</a>`;
+    linksHtml += `<a href="${streetViewUrl}" target="_blank" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-weight:700;"><i class="fa-solid fa-street-view"></i> ${isEn ? 'Open Google Street View 360° ↗' : 'Ver en Google Street View 360° ↗'}</a>`;
 
     if (e.linkFacebook) {
       linksHtml += `<a href="${e.linkFacebook}" target="_blank">${t('fb_link')}</a>`;
@@ -1146,10 +1216,25 @@ window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeLightbox();
     if (e.key === 'ArrowLeft') prevLightboxPhoto();
     if (e.key === 'ArrowRight') nextLightboxPhoto();
-  } else if ($('#detail').classList.contains('on')) {
+  } else if ($('#detail') && $('#detail').classList.contains('on')) {
     if (e.key === 'Escape') closeDetail();
   }
 });
+
+const detailEl = $('#detail');
+if (detailEl) {
+  detailEl.onclick = (e) => { if (e.target === detailEl) closeDetail(); };
+}
+
+const townModalEl = $('#town-modal');
+if (townModalEl) {
+  townModalEl.onclick = (e) => { if (e.target === townModalEl) closeTownModal(); };
+}
+
+const shareModalEl = $('#share-modal');
+if (shareModalEl) {
+  shareModalEl.onclick = (e) => { if (e.target === shareModalEl) closeShareModal(); };
+}
 
 const lightboxEl = $('#lightbox');
 if (lightboxEl) {

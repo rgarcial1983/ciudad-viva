@@ -1822,5 +1822,15 @@ window.copySocialPostText = () => {
   });
 };
 
+const adminDetailEl = $('#detail');
+if (adminDetailEl) {
+  adminDetailEl.onclick = (e) => { if (e.target === adminDetailEl) closeDetail(); };
+}
+
+const adminSocialModalEl = $('#social-share-modal');
+if (adminSocialModalEl) {
+  adminSocialModalEl.onclick = (e) => { if (e.target === adminSocialModalEl) closeSocialShareModal(); };
+}
+
 // Carga Inicial de datos para Administración
 Promise.all([loadTowns(), loadLocations(), loadEvents(), loadCategories()]);

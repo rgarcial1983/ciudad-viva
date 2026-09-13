@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/jpeg" href="icons/favicon.jpg">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -51,9 +52,14 @@
           <div class="search-wrap">
             <input id="search" data-i18n-placeholder="search_placeholder" placeholder="Buscar por título, temática o artista...">
           </div>
-          <select id="town" class="filter-select">
-            <option value="" data-i18n="all_towns">Todos los municipios</option>
-          </select>
+          <div style="display:flex; gap:6px; flex:1.5; min-width:250px;">
+            <select id="town" class="filter-select" style="flex:1;">
+              <option value="" data-i18n="all_towns">Todos los municipios</option>
+            </select>
+            <button id="btn-near-me" class="btn-secondary" style="padding:8px 12px; font-weight:700; white-space:nowrap; display:flex; align-items:center; gap:6px; font-size:13px; border-radius:10px;" title="Filtrar por mi municipio más cercano" aria-label="Cerca de mí">
+              <i class="fa-solid fa-location-crosshairs" style="color:var(--primary);"></i> <span data-i18n="btn_near_me">Cerca de mí</span>
+            </button>
+          </div>
           <select id="date" class="filter-select">
             <option value="" data-i18n="all_dates">🗓️ Todas las fechas</option>
             <option value="today" data-i18n="date_today">☀️ Hoy</option>
@@ -131,7 +137,7 @@
       <!-- Grid de Datos Prácticos -->
       <div class="modal-practical-grid">
         <div class="practical-card">
-          <div class="p-icon">📅</div>
+          <div class="p-icon"><i class="fa-regular fa-calendar-days"></i></div>
           <div>
             <span class="p-label" data-i18n="modal_when">Cuándo</span>
             <span id="dwhen" class="p-val"></span>
@@ -139,7 +145,7 @@
         </div>
 
         <div class="practical-card">
-          <div class="p-icon">🗺️</div>
+          <div class="p-icon"><i class="fa-solid fa-map-location-dot"></i></div>
           <div>
             <span class="p-label" data-i18n="modal_where">Dónde</span>
             <div id="dwhere" class="p-val"></div>
