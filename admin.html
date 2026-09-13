@@ -479,11 +479,14 @@
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <h3 style="margin:0;">Eventos registrados</h3>
               </div>
-              <div style="display:flex; gap:10px; margin-bottom:14px;">
-                <select id="admin-filter-town-events" style="flex:1; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+              <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
+                <select id="admin-filter-town-events" style="flex:1; min-width:160px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
                   <option value="">Todos los municipios autorizados</option>
                 </select>
-                <input id="admin-search-events" placeholder="🔍 Buscar por título, categoría o lugar..." style="flex:2; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+                <input id="admin-search-events" placeholder="🔍 Buscar por título, categoría o lugar..." style="flex:2; min-width:200px; padding:9px 12px; border:1px solid #e2e8f0; border-radius:8px; outline:none; font:inherit;">
+                <label style="font-size:13px; color:var(--text-muted); cursor:pointer; display:inline-flex; align-items:center; gap:5px; font-weight:600; white-space:nowrap;" title="Mostrar también los eventos con fecha pasada">
+                  <input type="checkbox" id="admin-include-past"> Incluir eventos pasados
+                </label>
               </div>
               <div id="admin-events-list" style="display:flex; flex-direction:column; gap:12px;">
                 <p class="muted">Cargando eventos...</p>

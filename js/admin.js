@@ -922,11 +922,62 @@ function getEventTimestamp(e) {
   return 9999999999999;
 }
 
+function getEventEndTimestamp(e) {
+  if (!e) return -1;
+
+  const endDate = e.dateEndRaw || e.dateEnd;
+  if (endDate && typeof endDate === 'string' && endDate.includes('-')) {
+    const cleanEnd = endDate.split('T')[0];
+    if (cleanEnd.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const [yr, mo, da] = cleanEnd.split('-').map(n => parseInt(n, 10));
+      const d = new Date(yr, mo - 1, da, 23, 59, 59);
+      if (!isNaN(d.getTime())) return d.getTime();
+    }
+  }
+
+  const dateStr = (e.dateLabel || e.date || '').toLowerCase();
+  if (dateStr) {
+    const endMatch = dateStr.match(/al\s+(\d{1,2})\s+(?:de\s+)?([a-záéíóú]+)(?:\s+(?:de\s+)?(\d{4}))?/i);
+    if (endMatch) {
+      const dayNum = parseInt(endMatch[1], 10);
+      const monthStr = endMatch[2].slice(0, 3);
+      const yearNum = endMatch[3] ? parseInt(endMatch[3], 10) : (e.year || new Date().getFullYear());
+      const monthMap = {
+        ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11,
+        jan:0, apr:3, aug:7, dec:11
+      };
+      if (monthStr in monthMap) {
+        const d = new Date(yearNum, monthMap[monthStr], dayNum, 23, 59, 59);
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+    }
+  }
+
+  const startTs = getEventTimestamp(e);
+  if (startTs !== Infinity && startTs !== 9999999999999) {
+    const d = new Date(startTs);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+  }
+
+  return Infinity;
+}
+
+function isPastEvent(e) {
+  const endTs = getEventEndTimestamp(e);
+  if (endTs === Infinity) return false;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  return endTs < startOfToday.getTime();
+}
+
 function getFilteredAdminEvents() {
   const query = ($('#admin-search-events') ? $('#admin-search-events').value : '').toLowerCase().trim();
   const townFilter = ($('#admin-filter-town-events') ? $('#admin-filter-town-events').value : '');
+  const includePast = ($('#admin-include-past') ? $('#admin-include-past').checked : false);
 
   const filtered = events.filter(e => 
+    (includePast || !isPastEvent(e)) &&
     isTownAllowed(e.town) &&
     (!townFilter || e.town === townFilter) &&
     (e.title.toLowerCase().includes(query) ||
@@ -953,7 +1004,7 @@ function renderAdminEvents() {
   const townFilter = ($('#admin-filter-town-events') ? $('#admin-filter-town-events').value : '');
 
   if (adminFilteredEvents.length === 0) {
-    adminEventsList.innerHTML = `<p class="muted">${(query || townFilter) ? 'No hay eventos que coincidan con la búsqueda o filtro seleccionado.' : 'No hay eventos en tus municipios asignados.'}</p>`;
+    adminEventsList.innerHTML = `<p class="muted">${(query || townFilter) ? 'No hay eventos que coincidan con la búsqueda o filtro seleccionado.' : 'No hay eventos activos en tus municipios asignados.'}</p>`;
   } else {
     adminEventsList.innerHTML = adminFilteredEvents.map(e => `
       <div class="admin-list-item">
@@ -973,6 +1024,7 @@ function renderAdminEvents() {
 
 if ($('#admin-search-events')) $('#admin-search-events').oninput = renderAdminEvents;
 if ($('#admin-filter-town-events')) $('#admin-filter-town-events').onchange = renderAdminEvents;
+if ($('#admin-include-past')) $('#admin-include-past').onchange = renderAdminEvents;
 
 if ($('#btn-export-pdf')) {
   $('#btn-export-pdf').onclick = () => exportAgendaPDF();
