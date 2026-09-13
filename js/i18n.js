@@ -18,6 +18,7 @@ const translations = {
     filter_free: "Solo gratuitos",
     filter_featured: "⭐ Destacados",
     btn_install: "📲 Instalar App",
+    btn_install_short: "Instalar App",
     theme_dark: "🌙 Modo Oscuro",
     theme_light: "☀️ Modo Claro",
     lang_btn: "🇬🇧 EN",
@@ -70,6 +71,7 @@ const translations = {
     filter_free: "Free only",
     filter_featured: "⭐ Featured",
     btn_install: "📲 Install App",
+    btn_install_short: "Install App",
     theme_dark: "🌙 Dark Mode",
     theme_light: "☀️ Light Mode",
     lang_btn: "🇪🇸 ES",
@@ -149,6 +151,42 @@ export function translateCategory(catName) {
     return categoryTranslations.en[catName];
   }
   return catName;
+}
+
+export function getCategoryIconHtml(categoryName) {
+  if (!categoryName) return '<i class="fa-solid fa-tag"></i>';
+  const name = categoryName.toLowerCase().trim();
+  if (name.includes('música') || name.includes('musica') || name.includes('concierto')) {
+    return '<i class="fa-solid fa-music"></i>';
+  }
+  if (name.includes('patrimonio') || name.includes('historia') || name.includes('monumento')) {
+    return '<i class="fa-solid fa-building-columns"></i>';
+  }
+  if (name.includes('gastronomía') || name.includes('gastronomia') || name.includes('tapas') || name.includes('comida')) {
+    return '<i class="fa-solid fa-utensils"></i>';
+  }
+  if (name.includes('taller') || name.includes('arte') || name.includes('artesanía') || name.includes('artesania')) {
+    return '<i class="fa-solid fa-palette"></i>';
+  }
+  if (name.includes('cine') || name.includes('película') || name.includes('pelicula') || name.includes('proyección')) {
+    return '<i class="fa-solid fa-clapperboard"></i>';
+  }
+  if (name.includes('deporte') || name.includes('carrera') || name.includes('senderismo') || name.includes('ruta')) {
+    return '<i class="fa-solid fa-person-running"></i>';
+  }
+  if (name.includes('teatro') || name.includes('danza') || name.includes('espectáculo') || name.includes('espectaculo')) {
+    return '<i class="fa-solid fa-masks-theater"></i>';
+  }
+  if (name.includes('infantil') || name.includes('familia') || name.includes('niños')) {
+    return '<i class="fa-solid fa-child-reaching"></i>';
+  }
+  if (name.includes('fiesta') || name.includes('feria') || name.includes('verbena')) {
+    return '<i class="fa-solid fa-champagne-glasses"></i>';
+  }
+  if (name.includes('naturaleza') || name.includes('medio ambiente')) {
+    return '<i class="fa-solid fa-tree"></i>';
+  }
+  return '<i class="fa-solid fa-tag"></i>';
 }
 
 export function translatePrice(priceText) {

@@ -25,7 +25,8 @@ function initAdminTheme() {
 function updateAdminThemeToggleUI(theme) {
   const btn = $('#admin-theme-toggle');
   if (btn) {
-    btn.innerHTML = theme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+    btn.innerHTML = theme === 'dark' ? '<i class="fa-solid fa-sun" style="color:#f59e0b;"></i>' : '<i class="fa-solid fa-moon"></i>';
+    btn.title = theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro';
   }
 }
 
@@ -612,16 +613,100 @@ function resetVenueForm() {
 let categories = [];
 
 const DEFAULT_CATEGORIES = [
-  { name: 'Música', icon: '🎵' },
-  { name: 'Patrimonio', icon: '🏛️' },
-  { name: 'Gastronomía', icon: '🍴' },
-  { name: 'Talleres', icon: '🎨' },
-  { name: 'Cine', icon: '🎬' },
-  { name: 'Deporte', icon: '🏃' }
+  { name: 'Música', icon: '<i class="fa-solid fa-music"></i>' },
+  { name: 'Patrimonio', icon: '<i class="fa-solid fa-building-columns"></i>' },
+  { name: 'Gastronomía', icon: '<i class="fa-solid fa-utensils"></i>' },
+  { name: 'Talleres', icon: '<i class="fa-solid fa-palette"></i>' },
+  { name: 'Cine', icon: '<i class="fa-solid fa-clapperboard"></i>' },
+  { name: 'Deporte', icon: '<i class="fa-solid fa-person-running"></i>' }
 ];
+
+const FONTAWESOME_ICONS = [
+  { class: 'fa-solid fa-music', title: 'Música' },
+  { class: 'fa-solid fa-building-columns', title: 'Patrimonio' },
+  { class: 'fa-solid fa-utensils', title: 'Gastronomía' },
+  { class: 'fa-solid fa-palette', title: 'Talleres / Arte' },
+  { class: 'fa-solid fa-clapperboard', title: 'Cine' },
+  { class: 'fa-solid fa-person-running', title: 'Deporte' },
+  { class: 'fa-solid fa-masks-theater', title: 'Teatro / Danza' },
+  { class: 'fa-solid fa-tree', title: 'Naturaleza' },
+  { class: 'fa-solid fa-child-reaching', title: 'Infantil / Familia' },
+  { class: 'fa-solid fa-champagne-glasses', title: 'Fiestas' },
+  { class: 'fa-solid fa-book-open', title: 'Conferencias' },
+  { class: 'fa-solid fa-microphone', title: 'Charlas' },
+  { class: 'fa-solid fa-camera', title: 'Fotografía' },
+  { class: 'fa-solid fa-trophy', title: 'Premios' },
+  { class: 'fa-solid fa-wand-magic-sparkles', title: 'Magia' },
+  { class: 'fa-solid fa-film', title: 'Películas' },
+  { class: 'fa-solid fa-guitar', title: 'Conciertos' },
+  { class: 'fa-solid fa-drum', title: 'Música en vivo' },
+  { class: 'fa-solid fa-church', title: 'Tradición' },
+  { class: 'fa-solid fa-bicycle', title: 'Ciclismo' },
+  { class: 'fa-solid fa-mountain-sun', title: 'Montaña' },
+  { class: 'fa-solid fa-chess', title: 'Juegos' },
+  { class: 'fa-solid fa-gamepad', title: 'Juventud' },
+  { class: 'fa-solid fa-tag', title: 'General' }
+];
+
+function initCategoryIconPicker() {
+  const grid = $('#icon-picker-grid');
+  const input = $('#new-cat-icon');
+  if (!grid || !input) return;
+
+  grid.innerHTML = FONTAWESOME_ICONS.map(item => `
+    <button type="button" class="icon-picker-btn" data-icon="${item.class}" title="${item.title}">
+      <i class="${item.class}"></i>
+    </button>
+  `).join('');
+
+  grid.querySelectorAll('.icon-picker-btn').forEach(btn => {
+    btn.onclick = () => {
+      grid.querySelectorAll('.icon-picker-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const iconClass = btn.dataset.icon;
+      input.value = `<i class="${iconClass}"></i>`;
+      updateIconPreview(input.value);
+    };
+  });
+
+  input.oninput = () => {
+    updateIconPreview(input.value);
+    syncActiveGridButton(input.value);
+  };
+}
+
+function updateIconPreview(val) {
+  const preview = $('#cat-icon-preview');
+  if (!preview) return;
+  if (!val) {
+    preview.innerHTML = `<i class="fa-solid fa-tag"></i>`;
+    return;
+  }
+  if (val.startsWith('<i')) {
+    preview.innerHTML = val;
+  } else if (val.startsWith('fa-')) {
+    preview.innerHTML = `<i class="${val}"></i>`;
+  } else {
+    preview.textContent = val;
+  }
+}
+
+function syncActiveGridButton(val) {
+  const grid = $('#icon-picker-grid');
+  if (!grid) return;
+  grid.querySelectorAll('.icon-picker-btn').forEach(b => {
+    const iconClass = b.dataset.icon;
+    if (val && (val.includes(iconClass) || val === iconClass)) {
+      b.classList.add('active');
+    } else {
+      b.classList.remove('active');
+    }
+  });
+}
 
 async function loadCategories() {
   try {
+    initCategoryIconPicker();
     const snapshot = await getDocs(categoriesRef);
     categories = [];
     snapshot.forEach(docSnap => {
@@ -652,24 +737,34 @@ function renderCategories() {
     return;
   }
 
-  listEl.innerHTML = categories.map(c => `
-    <div class="admin-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--card-bg); border:1px solid var(--border); border-radius:10px;">
-      <div>
-        <b style="font-size:15px; color:var(--text-main);">${c.icon || '🏷️'} ${c.name}</b>
+  listEl.innerHTML = categories.map(c => {
+    let iconHtml = c.icon || '';
+    if (iconHtml && !iconHtml.startsWith('<i') && iconHtml.startsWith('fa-')) {
+      iconHtml = `<i class="${iconHtml}"></i>`;
+    } else if (!iconHtml) {
+      iconHtml = '<i class="fa-solid fa-tag"></i>';
+    }
+
+    return `
+      <div class="admin-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--card-bg); border:1px solid var(--border); border-radius:10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:18px; color:var(--primary); width:24px; text-align:center;">${iconHtml}</span>
+          <b style="font-size:15px; color:var(--text-main);">${c.name}</b>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-action-edit" onclick="editCategory('${c.id}')">✏️ Editar</button>
+          <button class="btn-action-delete" onclick="deleteCategory('${c.id}')">🗑️ Eliminar</button>
+        </div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn-action-edit" onclick="editCategory('${c.id}')">✏️ Editar</button>
-        <button class="btn-action-delete" onclick="deleteCategory('${c.id}')">🗑️ Eliminar</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function updateCategorySelects() {
   const catSelect = $('#new-cat');
   if (!catSelect) return;
   const currentVal = catSelect.value;
-  catSelect.innerHTML = categories.map(c => `<option value="${c.name}">${c.icon || ''} ${c.name}</option>`).join('');
+  catSelect.innerHTML = categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
   if (currentVal && categories.some(c => c.name === currentVal)) {
     catSelect.value = currentVal;
   }
@@ -681,7 +776,11 @@ window.editCategory = (id) => {
 
   if ($('#cat-edit-id')) $('#cat-edit-id').value = c.id;
   if ($('#new-cat-name')) $('#new-cat-name').value = c.name;
-  if ($('#new-cat-icon')) $('#new-cat-icon').value = c.icon || '';
+  if ($('#new-cat-icon')) {
+    $('#new-cat-icon').value = c.icon || '';
+    updateIconPreview(c.icon || '');
+    syncActiveGridButton(c.icon || '');
+  }
 
   if ($('#cat-form-title')) $('#cat-form-title').textContent = "Editar Categoría";
   if ($('#save-cat')) $('#save-cat').textContent = "Actualizar categoría";
@@ -709,6 +808,8 @@ function resetCategoryForm() {
   if ($('#cat-edit-id')) $('#cat-edit-id').value = '';
   if ($('#new-cat-name')) $('#new-cat-name').value = '';
   if ($('#new-cat-icon')) $('#new-cat-icon').value = '';
+  updateIconPreview('');
+  syncActiveGridButton('');
   if ($('#cat-form-title')) $('#cat-form-title').textContent = "Añadir Categoría";
   if ($('#save-cat')) $('#save-cat').textContent = "Guardar categoría";
   if ($('#cancel-cat-edit')) $('#cancel-cat-edit').style.display = 'none';

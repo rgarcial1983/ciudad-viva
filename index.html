@@ -18,7 +18,7 @@
 <body>
 <main class="app">
   <header class="top">
-    <div class="brand" style="display:flex; align-items:center; gap:14px;">
+    <div class="brand" style="display:flex; align-items:center; gap:12px;">
       <img src="assets/logo.jpg" alt="Ciudad Viva Logo" style="height:68px; width:68px; border-radius:14px; object-fit:contain; background:#ffffff; padding:2px; box-shadow:0 3px 10px rgba(0,0,0,0.1); border:1px solid rgba(226,232,240,0.8);">
       <div>
         <h1 style="margin:0; font-size:24px; font-weight:800;">Ciudad Viva</h1>
@@ -29,15 +29,19 @@
       <div class="lang-flag-toggle" aria-label="Cambiar idioma / Switch language">
         <button id="lang-btn-es" class="flag-btn active" title="Cambiar a Español">
           <img src="assets/flag-es.png" alt="Español" class="flag-img">
-          <span>ES</span>
+          <span class="lang-text">ES</span>
         </button>
         <button id="lang-btn-en" class="flag-btn" title="Switch to English">
           <img src="assets/flag-en.png" alt="English" class="flag-img">
-          <span>EN</span>
+          <span class="lang-text">EN</span>
         </button>
       </div>
-      <button id="pwa-install-btn" class="btn-primary" style="padding:8px 14px; gap:6px; display:inline-flex; align-items:center; background:#2563eb; color:#ffffff; border:0; border-radius:8px; font-weight:600; cursor:pointer; font-size:14px; box-shadow:0 2px 6px rgba(37,99,235,0.3);" title="Instalar aplicación en tu dispositivo" data-i18n="btn_install">📲 Instalar App</button>
-      <button id="theme-toggle" class="btn-secondary" style="padding:8px 14px;" title="Cambiar tema" data-i18n="theme_dark">🌙 Modo Oscuro</button>
+      <button id="pwa-install-btn" class="btn-primary btn-install-app" title="Instalar aplicación en tu dispositivo">
+        <i class="fa-solid fa-mobile-screen-button"></i> <span class="btn-install-text" data-i18n="btn_install_short">Instalar App</span>
+      </button>
+      <button id="theme-toggle" class="btn-icon-toggle" title="Modo Oscuro" aria-label="Cambiar tema">
+        <i class="fa-solid fa-moon"></i>
+      </button>
     </div>
   </header>
 
@@ -73,13 +77,13 @@
         <!-- Chips deslizables -->
         <div class="chips-row">
           <button class="chip-item on" data-cat="">Todas</button>
-          <button class="chip-item chip-fav" data-favs="true">❤️ Favoritos (<span id="favs-badge">0</span>)</button>
-          <button class="chip-item" data-cat="Música">🎵 Música</button>
-          <button class="chip-item" data-cat="Patrimonio">🏛️ Patrimonio</button>
-          <button class="chip-item" data-cat="Gastronomía">🍴 Gastronomía</button>
-          <button class="chip-item" data-cat="Talleres">🎨 Talleres</button>
-          <button class="chip-item" data-cat="Cine">🎬 Cine</button>
-          <button class="chip-item" data-cat="Deporte">🏃 Deporte</button>
+          <button class="chip-item chip-fav" data-favs="true"><i class="fa-solid fa-heart" style="color:#ef4444;"></i> Favoritos (<span id="favs-badge">0</span>)</button>
+          <button class="chip-item" data-cat="Música"><i class="fa-solid fa-music"></i> Música</button>
+          <button class="chip-item" data-cat="Patrimonio"><i class="fa-solid fa-building-columns"></i> Patrimonio</button>
+          <button class="chip-item" data-cat="Gastronomía"><i class="fa-solid fa-utensils"></i> Gastronomía</button>
+          <button class="chip-item" data-cat="Talleres"><i class="fa-solid fa-palette"></i> Talleres</button>
+          <button class="chip-item" data-cat="Cine"><i class="fa-solid fa-clapperboard"></i> Cine</button>
+          <button class="chip-item" data-cat="Deporte"><i class="fa-solid fa-person-running"></i> Deporte</button>
         </div>
       </div>
     </div>

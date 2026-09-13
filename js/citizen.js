@@ -2,7 +2,7 @@ import {
   db, eventsRef, locationsRef, townsRef, categoriesRef, getDocs 
 } from "./firebase-config.js";
 import {
-  getLang, setLang, toggleLang, t, translateCategory, translatePrice, updateDOMTranslations
+  getLang, setLang, toggleLang, t, translateCategory, getCategoryIconHtml, translatePrice, updateDOMTranslations
 } from "./i18n.js";
 
 let selectedCategory = '';
@@ -94,7 +94,8 @@ function initTheme() {
 function updateThemeToggleUI(theme) {
   const btn = $('#theme-toggle');
   if (btn) {
-    btn.innerHTML = theme === 'dark' ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+    btn.innerHTML = theme === 'dark' ? '<i class="fa-solid fa-sun" style="color:#f59e0b;"></i>' : '<i class="fa-solid fa-moon"></i>';
+    btn.title = theme === 'dark' ? (getLang() === 'en' ? 'Light Mode' : 'Modo Claro') : (getLang() === 'en' ? 'Dark Mode' : 'Modo Oscuro');
   }
 }
 
@@ -315,12 +316,12 @@ window.toggleFavorite = (eventId, event) => {
 let categories = [];
 
 const DEFAULT_CATEGORIES = [
-  { name: 'Música', icon: '🎵' },
-  { name: 'Patrimonio', icon: '🏛️' },
-  { name: 'Gastronomía', icon: '🍴' },
-  { name: 'Talleres', icon: '🎨' },
-  { name: 'Cine', icon: '🎬' },
-  { name: 'Deporte', icon: '🏃' }
+  { name: 'Música', icon: '<i class="fa-solid fa-music"></i>' },
+  { name: 'Patrimonio', icon: '<i class="fa-solid fa-building-columns"></i>' },
+  { name: 'Gastronomía', icon: '<i class="fa-solid fa-utensils"></i>' },
+  { name: 'Talleres', icon: '<i class="fa-solid fa-palette"></i>' },
+  { name: 'Cine', icon: '<i class="fa-solid fa-clapperboard"></i>' },
+  { name: 'Deporte', icon: '<i class="fa-solid fa-person-running"></i>' }
 ];
 
 async function loadCategories() {
@@ -353,12 +354,13 @@ function renderCategoryChips() {
   const favsLabel = isEn ? 'Favorites' : 'Favoritos';
 
   let html = `<button class="chip-item ${!selectedCategory && !showOnlyFavorites ? 'on' : ''}" data-cat="">${allLabel}</button>`;
-  html += `<button class="chip-item chip-fav ${showOnlyFavorites ? 'on' : ''}" data-favs="true">❤️ ${favsLabel} (<span id="favs-badge">${favCount}</span>)</button>`;
+  html += `<button class="chip-item chip-fav ${showOnlyFavorites ? 'on' : ''}" data-favs="true"><i class="fa-solid fa-heart" style="color:#ef4444;"></i> ${favsLabel} (<span id="favs-badge">${favCount}</span>)</button>`;
 
   html += categories.map(c => {
     const isOn = selectedCategory === c.name && !showOnlyFavorites;
     const catDisplayName = translateCategory(c.name);
-    return `<button class="chip-item ${isOn ? 'on' : ''}" data-cat="${c.name}">${c.icon || ''} ${catDisplayName}</button>`;
+    const iconHtml = (c.icon && c.icon.startsWith('<i')) ? c.icon : getCategoryIconHtml(c.name);
+    return `<button class="chip-item ${isOn ? 'on' : ''}" data-cat="${c.name}">${iconHtml} ${catDisplayName}</button>`;
   }).join('');
 
   chipsRow.innerHTML = html;
@@ -815,7 +817,7 @@ function draw() {
             </div>
             <div class="card-body">
               <div class="card-meta">
-                <span class="tag-category">${translateCategory(e.category)}</span>
+                <span class="tag-category">${getCategoryIconHtml(e.category)} ${translateCategory(e.category)}</span>
                 <span class="price-tag ${isFree ? '' : 'paid'}">${translatePrice(e.price)}</span>
               </div>
               <h4>${e.title}</h4>
@@ -999,7 +1001,7 @@ window.openDetail = function(id) {
   let e = events.find(ev => ev.id === id);
   if(!e) return;
 
-  if ($('#dtag')) $('#dtag').textContent = translateCategory(e.category);
+  if ($('#dtag')) $('#dtag').innerHTML = `${getCategoryIconHtml(e.category)} ${translateCategory(e.category)}`;
   if ($('#dtitle')) $('#dtitle').textContent = e.title;
   if ($('#ddesc')) $('#ddesc').textContent = e.description;
   if ($('#dwhen')) $('#dwhen').textContent = getEventDateLabel(e) + ' · ' + e.time;
