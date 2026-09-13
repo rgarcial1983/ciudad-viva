@@ -953,8 +953,7 @@ function draw() {
               <h4>${e.title}</h4>
               <p class="venue">🗺️ ${cleanVenueName(e.venue, e.town)}</p>
               <div class="card-footer">
-                <span class="muted">${getEventDateLabel(e)}</span>
-                <button class="btn-detail" onclick="openDetail('${e.id}')">${t('btn_detail')}</button>
+                <button class="btn-detail" onclick="openDetail('${e.id}')"><span>${t('btn_detail')}</span> <i class="fa-solid fa-arrow-right"></i></button>
               </div>
             </div>
           </article>
