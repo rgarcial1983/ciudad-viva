@@ -480,6 +480,62 @@ const TOWN_COORDINATES = {
   'Torredelcampo': { lat: 37.7828, lng: -3.9048 }
 };
 
+function getEventTimestamp(e) {
+  if (!e) return Infinity;
+
+  const rawDate = e.dateRaw || e.dateStartRaw || e.date;
+  if (rawDate && typeof rawDate === 'string' && rawDate.includes('-')) {
+    const cleanDate = rawDate.split('T')[0];
+    if (cleanDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const timeStr = (e.time && e.time.match(/\d{1,2}:\d{2}/)) ? e.time.match(/\d{1,2}:\d{2}/)[0] : '00:00';
+      const [hh, mm] = timeStr.split(':').map(n => parseInt(n, 10));
+      const [yr, mo, da] = cleanDate.split('-').map(n => parseInt(n, 10));
+      const d = new Date(yr, mo - 1, da, hh || 0, mm || 0);
+      if (!isNaN(d.getTime())) return d.getTime();
+    }
+  }
+
+  const dateStr = (e.dateLabel || e.date || '').toLowerCase();
+  if (dateStr) {
+    if (dateStr.includes('hoy')) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      return now.getTime();
+    }
+    if (dateStr.includes('mañana')) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      return tomorrow.getTime();
+    }
+
+    const match = dateStr.match(/(?:del\s+)?(\d{1,2})\s+(?:de\s+)?(?:al\s+\d{1,2}\s+(?:de\s+)?)?([a-záéíóú]+)(?:\s+(?:de\s+)?(\d{4}))?/i);
+    if (match) {
+      const dayNum = parseInt(match[1], 10);
+      const monthStr = match[2].slice(0, 3);
+      const yearNum = match[3] ? parseInt(match[3], 10) : (e.year || new Date().getFullYear());
+      const monthMap = {
+        ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11,
+        jan:0, apr:3, aug:7, dec:11
+      };
+      if (monthStr in monthMap) {
+        const timeStr = (e.time && e.time.match(/\d{1,2}:\d{2}/)) ? e.time.match(/\d{1,2}:\d{2}/)[0] : '00:00';
+        const [hh, mm] = timeStr.split(':').map(n => parseInt(n, 10));
+        const d = new Date(yearNum, monthMap[monthStr], dayNum, hh || 0, mm || 0);
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+    }
+
+    const slashMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (slashMatch) {
+      const d = new Date(parseInt(slashMatch[3], 10), parseInt(slashMatch[2], 10) - 1, parseInt(slashMatch[1], 10));
+      if (!isNaN(d.getTime())) return d.getTime();
+    }
+  }
+
+  return 9999999999999;
+}
+
 function getFilteredEvents() {
   const favsList = getFavorites();
   let q = ($('#search') ? $('#search').value : '').toLowerCase();
@@ -495,7 +551,12 @@ function getFilteredEvents() {
     matchesDateFilter(e, dateVal, customDateVal)
   );
 
-  shown.sort((a, b) => (b.featured ? 1 : 0) - (a.featured ? 1 : 0));
+  shown.sort((a, b) => {
+    if (b.featured !== a.featured) {
+      return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+    }
+    return getEventTimestamp(a) - getEventTimestamp(b);
+  });
   return shown;
 }
 
