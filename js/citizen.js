@@ -682,7 +682,7 @@ function initOrUpdateMap(filteredEvents) {
         <h4 class="map-popup-title">${e.title}</h4>
         <div class="map-popup-meta">
           <span>📅 ${getEventDateLabel(e)}</span>
-          <span>🏰 ${e.town} · <i class="fa-solid fa-location-dot" style="color:var(--primary); margin-right:3px;"></i>${e.venue}</span>
+          <span>🏰 ${e.town} · <i class="fa-solid fa-location-dot" style="color:#ef4444; margin-right:3px;"></i>${e.venue}</span>
         </div>
         <button class="map-popup-btn" onclick="openDetail('${e.id}')">${t('btn_detail')}</button>
       </div>
@@ -738,7 +738,7 @@ function exportFilteredEventsPDF(filteredEvents) {
       </div>
       <h3 style="margin: 0 0 4px 0; font-size: 16px; color: #0f172a;">${e.title}</h3>
       <div style="font-size: 12px; color: #475569; margin-bottom: 4px;">
-        <span>📅 ${getEventDateLabel(e)} · ${e.time || ''}</span> | <span><i class="fa-solid fa-location-dot" style="color:#2563eb; margin-right:3px;"></i>${cleanVenueName(e.venue, e.town)}</span>
+        <span>📅 ${getEventDateLabel(e)} · ${e.time || ''}</span> | <span><i class="fa-solid fa-location-dot" style="color:#ef4444; margin-right:3px;"></i>${cleanVenueName(e.venue, e.town)}</span>
       </div>
       <p style="font-size: 12px; color: #64748b; margin: 0; line-height: 1.4;">${(e.description || '').substring(0, 150)}...</p>
     </div>
@@ -951,7 +951,7 @@ function draw() {
                 <span class="price-tag ${isFree ? '' : 'paid'}">${translatePrice(e.price)}</span>
               </div>
               <h4>${e.title}</h4>
-              <p class="venue"><i class="fa-solid fa-location-dot" style="color:var(--primary); margin-right:4px;"></i>${cleanVenueName(e.venue, e.town)}</p>
+              <p class="venue"><i class="fa-solid fa-location-dot" style="color:#ef4444; margin-right:4px;"></i>${cleanVenueName(e.venue, e.town)}</p>
               <div class="card-footer">
                 <button class="btn-detail" onclick="openDetail('${e.id}')"><i class="fa-solid fa-circle-info"></i> <span>${t('btn_detail')}</span></button>
               </div>
@@ -1181,7 +1181,7 @@ function getGoogleStreetViewUrl(venue, town, locObj) {
     const isEn = getLang() === 'en';
     let detailsHtml = '';
     if (locObj) {
-      if (locObj.address) detailsHtml += `<div><i class="fa-solid fa-location-dot" style="color:var(--primary); margin-right:4px;"></i> <b>${isEn ? 'Address' : 'Dirección'}:</b> ${locObj.address}</div>`;
+      if (locObj.address) detailsHtml += `<div><i class="fa-solid fa-location-dot" style="color:#ef4444; margin-right:4px;"></i> <b>${isEn ? 'Address' : 'Dirección'}:</b> ${locObj.address}</div>`;
       if (locObj.capacity) detailsHtml += `<div><i class="fa-solid fa-users" style="color:var(--primary); margin-right:4px;"></i> <b>${isEn ? 'Max capacity' : 'Aforo máximo'}:</b> ${locObj.capacity}</div>`;
       if (locObj.phone) detailsHtml += `<div><i class="fa-solid fa-phone" style="color:var(--primary); margin-right:4px;"></i> <b>${isEn ? 'Contact / Box office' : 'Contacto / Taquilla'}:</b> ${locObj.phone}</div>`;
     }
