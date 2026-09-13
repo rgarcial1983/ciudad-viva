@@ -592,6 +592,13 @@ function initOrUpdateMap(filteredEvents) {
   }
 }
 
+function cleanVenueName(venue, town) {
+  if (!venue) return '';
+  if (!town) return venue;
+  const escapedTown = town.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return venue.replace(new RegExp(`\\s*\\(${escapedTown}\\)`, 'gi'), '').trim();
+}
+
 function exportFilteredEventsPDF(filteredEvents) {
   if (typeof html2pdf === 'undefined') {
     alert('Error: html2pdf no está disponible');
@@ -603,8 +610,12 @@ function exportFilteredEventsPDF(filteredEvents) {
   const nowStr = new Date().toLocaleDateString(isEn ? 'en-US' : 'es-ES');
 
   const pdfContainer = document.createElement('div');
+  pdfContainer.style.position = 'fixed';
+  pdfContainer.style.top = '0';
+  pdfContainer.style.left = '-9999px';
+  pdfContainer.style.width = '750px';
   pdfContainer.style.padding = '24px';
-  pdfContainer.style.fontFamily = 'system-ui, sans-serif';
+  pdfContainer.style.fontFamily = 'system-ui, -apple-system, sans-serif';
   pdfContainer.style.color = '#0f172a';
   pdfContainer.style.background = '#ffffff';
 
@@ -616,7 +627,7 @@ function exportFilteredEventsPDF(filteredEvents) {
       </div>
       <h3 style="margin: 0 0 4px 0; font-size: 16px; color: #0f172a;">${e.title}</h3>
       <div style="font-size: 12px; color: #475569; margin-bottom: 4px;">
-        <span>📅 ${getEventDateLabel(e)} · ${e.time || ''}</span> | <span>🗺️ ${e.venue}</span>
+        <span>📅 ${getEventDateLabel(e)} · ${e.time || ''}</span> | <span>🗺️ ${cleanVenueName(e.venue, e.town)}</span>
       </div>
       <p style="font-size: 12px; color: #64748b; margin: 0; line-height: 1.4;">${(e.description || '').substring(0, 150)}...</p>
     </div>
@@ -636,15 +647,21 @@ function exportFilteredEventsPDF(filteredEvents) {
     </div>
   `;
 
+  document.body.appendChild(pdfContainer);
+
   const opt = {
-    margin: 10,
+    margin: [8, 8, 8, 8],
     filename: `Agenda_Ciudad_Viva_${selectedTownName.replace(/\s+/g, '_')}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2 },
+    html2canvas: { scale: 2, scrollY: 0, scrollX: 0, useCORS: true, logging: false },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
-  html2pdf().set(opt).from(pdfContainer).save();
+  html2pdf().set(opt).from(pdfContainer).save().then(() => {
+    if (pdfContainer.parentNode) pdfContainer.parentNode.removeChild(pdfContainer);
+  }).catch(() => {
+    if (pdfContainer.parentNode) pdfContainer.parentNode.removeChild(pdfContainer);
+  });
 }
 
 function setupViewAndExportListeners() {
@@ -823,7 +840,7 @@ function draw() {
                 <span class="price-tag ${isFree ? '' : 'paid'}">${translatePrice(e.price)}</span>
               </div>
               <h4>${e.title}</h4>
-              <p class="venue">🗺️ ${e.venue}</p>
+              <p class="venue">🗺️ ${cleanVenueName(e.venue, e.town)}</p>
               <div class="card-footer">
                 <span class="muted">${getEventDateLabel(e)}</span>
                 <button class="btn-detail" onclick="openDetail('${e.id}')">${t('btn_detail')}</button>

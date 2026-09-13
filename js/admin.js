@@ -879,6 +879,13 @@ function getFilteredAdminEvents() {
   );
 }
 
+function cleanVenueName(venue, town) {
+  if (!venue) return '';
+  if (!town) return venue;
+  const escapedTown = town.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return venue.replace(new RegExp(`\\s*\\(${escapedTown}\\)`, 'gi'), '').trim();
+}
+
 function renderAdminEvents() {
   const adminEventsList = $('#admin-events-list');
   if (!adminEventsList) return;
@@ -894,7 +901,7 @@ function renderAdminEvents() {
       <div class="admin-list-item">
         <div>
           <b style="font-size:15px;">${e.title}</b><br>
-          <span class="muted" style="font-size:13px;">${e.category} · ${e.venue} (${getEventDateLabel(e)} · ${e.time}) · <b>${e.town}</b></span>
+          <span class="muted" style="font-size:13px;">${e.category} · ${cleanVenueName(e.venue, e.town)} (${getEventDateLabel(e)} · ${e.time}) · <b>${e.town}</b></span>
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn-secondary" style="font-size:12px; font-weight:700; padding:6px 10px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;" onclick="openSocialShareModal('${e.id}')">📱 Difundir RRSS</button>
@@ -938,6 +945,10 @@ function exportAgendaPDF() {
   const subtitleText = `Boletín Oficial de Agenda Cultural (${subtitleParts.join(' · ')})`;
 
   const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.top = '0';
+  container.style.left = '-9999px';
+  container.style.width = '750px';
   container.style.padding = '24px';
   container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
   container.style.color = '#0f172a';
@@ -976,7 +987,7 @@ function exportAgendaPDF() {
         <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${getEventDateLabel(e)}<br><span style="font-weight:normal; font-size:11px; color:#64748b;">${e.time || '20:00'}</span></td>
         <td style="padding:8px 10px;"><b style="font-size:13px; color:#0f172a;">${e.title}</b><br><span style="color:#475569; font-size:11px;">${(e.description || '').slice(0, 90)}${(e.description || '').length > 90 ? '...' : ''}</span></td>
         <td style="padding:8px 10px; font-weight:600; color:#2563eb;">${e.category}</td>
-        <td style="padding:8px 10px;">${e.venue}<br><span style="font-weight:600; color:#64748b; font-size:11px;">${e.town}</span></td>
+        <td style="padding:8px 10px;">${cleanVenueName(e.venue, e.town)}<br><span style="font-weight:600; color:#64748b; font-size:11px;">${e.town}</span></td>
         <td style="padding:8px 10px; font-weight:700; color:#047857;">${e.price}</td>
       </tr>
     `;
@@ -991,22 +1002,28 @@ function exportAgendaPDF() {
   `;
 
   container.innerHTML = html;
+  document.body.appendChild(container);
 
   const pdfName = townFilterVal ? `Agenda_Cultural_${townFilterVal.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf` : `Agenda_Cultural_CiudadViva_${new Date().toISOString().slice(0,10)}.pdf`;
 
   const opt = {
-    margin: 8,
+    margin: [8, 8, 8, 8],
     filename: pdfName,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, scrollY: 0, scrollX: 0, useCORS: true, logging: false },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
 
   if (typeof html2pdf !== 'undefined') {
     notifySuccess(`Exportando ${filteredEvents.length} eventos a PDF...`);
-    html2pdf().set(opt).from(container).save();
+    html2pdf().set(opt).from(container).save().then(() => {
+      if (container.parentNode) container.parentNode.removeChild(container);
+    }).catch(() => {
+      if (container.parentNode) container.parentNode.removeChild(container);
+    });
   } else {
     notifyError('Error', 'La librería de exportación a PDF no se ha cargado correctamente.');
+    if (container.parentNode) container.parentNode.removeChild(container);
   }
 }
 
