@@ -31,30 +31,32 @@ function formatDateLabel(dateStr, dateEndStr = null) {
 
   const days = isEn ? daysEn : daysEs;
   const months = isEn ? monthsEn : monthsEs;
+  const yrStart = dStart.getFullYear();
 
   if (dateEndStr && dateEndStr.trim() !== '' && dateEndStr !== cleanStart) {
     const cleanEnd = dateEndStr.includes('T') ? dateEndStr.split('T')[0] : dateEndStr;
     const dEnd = new Date(cleanEnd + 'T00:00:00');
     if (!isNaN(dEnd.getTime()) && dEnd > dStart) {
-      if (dStart.getMonth() === dEnd.getMonth() && dStart.getFullYear() === dEnd.getFullYear()) {
+      const yrEnd = dEnd.getFullYear();
+      if (dStart.getMonth() === dEnd.getMonth() && yrStart === yrEnd) {
         return isEn 
-          ? `${months[dEnd.getMonth()]} ${dStart.getDate()} - ${dEnd.getDate()}`
-          : `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
-      } else if (dStart.getFullYear() === dEnd.getFullYear()) {
+          ? `${months[dEnd.getMonth()]} ${dStart.getDate()} - ${dEnd.getDate()}, ${yrStart}`
+          : `Del ${dStart.getDate()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${yrStart}`;
+      } else if (yrStart === yrEnd) {
         return isEn
-          ? `${months[dStart.getMonth()]} ${dStart.getDate()} - ${months[dEnd.getMonth()]} ${dEnd.getDate()}`
-          : `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]}`;
+          ? `${months[dStart.getMonth()]} ${dStart.getDate()} - ${months[dEnd.getMonth()]} ${dEnd.getDate()}, ${yrStart}`
+          : `Del ${dStart.getDate()} ${months[dStart.getMonth()]} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${yrStart}`;
       } else {
         return isEn
-          ? `${months[dStart.getMonth()]} ${dStart.getDate()}, ${dStart.getFullYear()} - ${months[dEnd.getMonth()]} ${dEnd.getDate()}, ${dEnd.getFullYear()}`
-          : `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${dStart.getFullYear()} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${dEnd.getFullYear()}`;
+          ? `${months[dStart.getMonth()]} ${dStart.getDate()}, ${yrStart} - ${months[dEnd.getMonth()]} ${dEnd.getDate()}, ${yrEnd}`
+          : `Del ${dStart.getDate()} ${months[dStart.getMonth()]} ${yrStart} al ${dEnd.getDate()} ${months[dEnd.getMonth()]} ${yrEnd}`;
       }
     }
   }
 
   return isEn
-    ? `${days[dStart.getDay()]}, ${months[dStart.getMonth()]} ${dStart.getDate()}`
-    : `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]}`;
+    ? `${days[dStart.getDay()]}, ${months[dStart.getMonth()]} ${dStart.getDate()}, ${yrStart}`
+    : `${days[dStart.getDay()]}, ${dStart.getDate()} ${months[dStart.getMonth()]} ${yrStart}`;
 }
 
 function getEventDateLabel(e) {
@@ -62,22 +64,22 @@ function getEventDateLabel(e) {
   if (e.dateRaw) return formatDateLabel(e.dateRaw, e.dateEndRaw || e.dateEnd);
   if (e.date && e.date.includes('-')) return formatDateLabel(e.date, e.dateEnd);
   if (e.dateLabel) {
-    if (e.dateLabel.includes(',') || e.dateLabel.toLowerCase().includes('del')) return e.dateLabel;
+    if (e.dateLabel.includes('202') || e.dateLabel.includes('203')) return e.dateLabel;
     const m = e.dateLabel.match(/^(\d{1,2})\s+([A-Za-záéíóúÁÉÍÓÚ]+)(?:\s+(\d{4}))?$/);
     if (m) {
       const dayNum = parseInt(m[1], 10);
       const monthStr = m[2].toLowerCase().slice(0, 3);
-      const yearNum = m[3] ? parseInt(m[3], 10) : 2026;
+      const yearNum = m[3] ? parseInt(m[3], 10) : new Date().getFullYear();
       const monthMap = { ene:0, feb:1, mar:2, abr:3, may:4, jun:5, jul:6, ago:7, sep:8, oct:9, nov:10, dic:11 };
       if (monthStr in monthMap) {
         const d = new Date(yearNum, monthMap[monthStr], dayNum);
         if (!isNaN(d.getTime())) {
           const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-          return `${days[d.getDay()]}, ${e.dateLabel}`;
+          return `${days[d.getDay()]}, ${dayNum} ${m[2]} ${yearNum}`;
         }
       }
     }
-    return e.dateLabel;
+    return `${e.dateLabel} ${new Date().getFullYear()}`;
   }
   return 'Próximamente';
 }
