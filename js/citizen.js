@@ -533,6 +533,9 @@ function getEventTimestamp(e) {
     }
   }
 
+  return 9999999999999;
+}
+
 function getEventEndTimestamp(e) {
   if (!e) return -1;
 
