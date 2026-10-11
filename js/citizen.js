@@ -1193,28 +1193,31 @@ function getGoogleStreetViewUrl(venue, town, locObj) {
     }
   }
 
+  const isEnLang = getLang() === 'en';
   const btnCal = $('#btn-add-calendar');
   if (btnCal) {
-    btnCal.innerHTML = t('modal_calendar');
+    btnCal.innerHTML = `<i class="fa-regular fa-calendar-plus notranslate" translate="no"></i> <span>${isEnLang ? 'Add to my calendar' : 'Añadir a mi calendario'}</span>`;
     btnCal.onclick = () => showAddToCalendarDialog(e);
   }
 
   const btnFavDetail = $('#btn-fav-detail');
   if (btnFavDetail) {
-    const favCurrently = isFavorite(e.id);
-    btnFavDetail.innerHTML = favCurrently ? t('modal_favorite_active') : t('modal_favorite');
-    btnFavDetail.className = `btn-secondary ${favCurrently ? 'is-fav-active' : ''}`;
+    const updateFavBtn = (isFav) => {
+      btnFavDetail.innerHTML = isFav 
+        ? `<i class="fa-solid fa-heart notranslate" style="color:#ef4444;" translate="no"></i> <span>${isEnLang ? 'Saved' : 'Guardado'}</span>`
+        : `<i class="fa-regular fa-heart notranslate" translate="no"></i> <span>${isEnLang ? 'Save' : 'Guardar'}</span>`;
+      btnFavDetail.className = `btn-secondary ${isFav ? 'is-fav-active' : ''}`;
+    };
+    updateFavBtn(isFavorite(e.id));
     btnFavDetail.onclick = () => {
       toggleFavorite(e.id);
-      const isNowFav = isFavorite(e.id);
-      btnFavDetail.innerHTML = isNowFav ? t('modal_favorite_active') : t('modal_favorite');
-      btnFavDetail.className = `btn-secondary ${isNowFav ? 'is-fav-active' : ''}`;
+      updateFavBtn(isFavorite(e.id));
     };
   }
 
   const btnShare = $('#btn-share-event');
   if (btnShare) {
-    btnShare.innerHTML = t('modal_share');
+    btnShare.innerHTML = `<i class="fa-solid fa-share-nodes notranslate" translate="no"></i> <span>${isEnLang ? 'Share' : 'Compartir'}</span>`;
     btnShare.onclick = () => shareEvent(e);
   }
 
