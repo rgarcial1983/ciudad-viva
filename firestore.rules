@@ -1,0 +1,209 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Application: Ciudad Viva (Civic Cultural Agenda)
+// Firebase Project: ciudad-viva-1c19f
+//
+// 1. Collection: towns
+//    Document ID: auto-generated or slug string
+//    Fields:
+//      - name: string (required, 1-100 chars) - Name of the municipality
+//      - province: string (optional, 1-100 chars) - Province name (e.g., 'Jaén')
+//
+// 2. Collection: categories
+//    Document ID: auto-generated string
+//    Fields:
+//      - name: string (required, 1-100 chars) - Category name (e.g., 'Música')
+//      - icon: string (optional, 0-200 chars) - FontAwesome icon class or HTML tag
+//
+// 3. Collection: locations (cultural spaces / venues)
+//    Document ID: auto-generated string
+//    Fields:
+//      - name: string (required, 1-150 chars) - Venue name
+//      - town: string (optional, 0-100 chars) - Town where venue is located
+//      - mapsUrl: string (optional, 0-500 chars) - Google Maps URL
+//      - address: string (optional, 0-300 chars) - Physical street address
+//      - capacity: string (optional, 0-100 chars) - Capacity/aforo
+//      - phone: string (optional, 0-50 chars) - Contact telephone
+//      - lat: number or string (optional, coordinates)
+//      - lng: number or string (optional, coordinates)
+//
+// 4. Collection: events (cultural activities / agenda)
+//    Document ID: auto-generated string
+//    Fields:
+//      - title: string (required, 1-200 chars) - Event title
+//      - category: string (required, 1-100 chars) - Category name
+//      - town: string (required, 1-100 chars) - Municipality
+//      - venue: string (required, 1-200 chars) - Location / space name
+//      - dateRaw: string (optional, 0-100 chars) - Start date (YYYY-MM-DD)
+//      - dateEndRaw: string (optional, 0-100 chars) - End date (YYYY-MM-DD)
+//      - dateEnd: string (optional, legacy end date)
+//      - dateStartRaw: string (optional, legacy start date)
+//      - date: string (optional, legacy date)
+//      - dateLabel: string (optional, 0-200 chars) - Formatted human-readable date
+//      - year: number (optional, event year)
+//      - time: string (optional, 0-50 chars) - Time of day (e.g., '20:00')
+//      - price: string (optional, 0-100 chars) - Price string (e.g., 'Gratis', '10.00 €')
+//      - featured: bool (optional) - Highlighted event flag
+//      - description: string (optional, 0-5000 chars) - Event description text
+//      - linkFacebook: string (optional, 0-500 chars) - Facebook link
+//      - linkWeb: string (optional, 0-500 chars) - Web link
+//      - photos: list (optional, max 10 elements, Base64/URL strings)
+//      - primaryPhotoIdx: number (optional, index of the cover photo)
+//      - createdAt: timestamp (optional/immutable after creation)
+//
+// 5. Collection: users (admin managers / editors)
+//    Document ID: Firebase Auth UID
+//    Fields:
+//      - uid: string (required, matches auth UID, 1-128 chars, immutable)
+//      - email: string (required, 1-150 chars)
+//      - role: string (optional, 'superadmin' | 'editor' | 'admin' | 'user')
+//      - allowedTowns: list of strings (optional, list of authorized towns, max 100 items)
+//      - createdAt: timestamp (optional, immutable)
+//      - facebookPage: string (optional, 0-500 chars)
+//      - twitterHandle: string (optional, 0-100 chars)
+//      - instagramHandle: string (optional, 0-100 chars)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidTown(data) {
+      return data.keys().hasOnly(['name', 'province']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        (!('province' in data) || (data.province is string && data.province.size() > 0 && data.province.size() <= 100));
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasOnly(['name', 'icon']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        (!('icon' in data) || (data.icon is string && data.icon.size() <= 200));
+    }
+
+    function isValidLocation(data) {
+      return data.keys().hasOnly(['name', 'town', 'mapsUrl', 'address', 'capacity', 'phone', 'lat', 'lng']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 150 &&
+        (!('town' in data) || (data.town is string && data.town.size() <= 100)) &&
+        (!('mapsUrl' in data) || (data.mapsUrl is string && data.mapsUrl.size() <= 500)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+        (!('capacity' in data) || (data.capacity is string && data.capacity.size() <= 100)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('lat' in data) || (data.lat is number || (data.lat is string && data.lat.size() <= 50))) &&
+        (!('lng' in data) || (data.lng is number || (data.lng is string && data.lng.size() <= 50)));
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasOnly([
+        'title', 'category', 'town', 'venue', 'dateRaw', 'dateEndRaw', 
+        'dateEnd', 'dateStartRaw', 'date', 'dateLabel', 'year', 'time', 
+        'price', 'featured', 'description', 'linkFacebook', 'linkWeb', 
+        'photos', 'primaryPhotoIdx', 'createdAt'
+      ]) &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.category is string && data.category.size() > 0 && data.category.size() <= 100 &&
+        data.town is string && data.town.size() > 0 && data.town.size() <= 100 &&
+        data.venue is string && data.venue.size() > 0 && data.venue.size() <= 200 &&
+        (!('dateRaw' in data) || (data.dateRaw is string && data.dateRaw.size() <= 100)) &&
+        (!('dateEndRaw' in data) || (data.dateEndRaw is string && data.dateEndRaw.size() <= 100)) &&
+        (!('dateEnd' in data) || (data.dateEnd is string && data.dateEnd.size() <= 100)) &&
+        (!('dateStartRaw' in data) || (data.dateStartRaw is string && data.dateStartRaw.size() <= 100)) &&
+        (!('date' in data) || (data.date is string && data.date.size() <= 100)) &&
+        (!('dateLabel' in data) || (data.dateLabel is string && data.dateLabel.size() <= 200)) &&
+        (!('year' in data) || data.year is number) &&
+        (!('time' in data) || (data.time is string && data.time.size() <= 50)) &&
+        (!('price' in data) || (data.price is string && data.price.size() <= 100)) &&
+        (!('featured' in data) || data.featured is bool) &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 5000)) &&
+        (!('linkFacebook' in data) || (data.linkFacebook is string && data.linkFacebook.size() <= 500)) &&
+        (!('linkWeb' in data) || (data.linkWeb is string && data.linkWeb.size() <= 500)) &&
+        (!('photos' in data) || (data.photos is list && data.photos.size() <= 10)) &&
+        (!('primaryPhotoIdx' in data) || (data.primaryPhotoIdx is number && data.primaryPhotoIdx >= 0 && data.primaryPhotoIdx <= 10)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasOnly([
+        'uid', 'email', 'role', 'allowedTowns', 'createdAt', 
+        'facebookPage', 'twitterHandle', 'instagramHandle'
+      ]) &&
+        data.uid is string && data.uid.size() > 0 && data.uid.size() <= 128 &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 150 &&
+        (!('role' in data) || (data.role is string && data.role in ['superadmin', 'editor', 'admin', 'user'])) &&
+        (!('allowedTowns' in data) || (data.allowedTowns is list && data.allowedTowns.size() <= 100)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        (!('facebookPage' in data) || (data.facebookPage is string && data.facebookPage.size() <= 500)) &&
+        (!('twitterHandle' in data) || (data.twitterHandle is string && data.twitterHandle.size() <= 100)) &&
+        (!('instagramHandle' in data) || (data.instagramHandle is string && data.instagramHandle.size() <= 100));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // Public civic cultural agenda collections:
+    // Read: unauthenticated public access allowed.
+    // Writes: authenticated managers only.
+
+    match /towns/{townId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidTown(request.resource.data);
+      allow update: if isAuthenticated() && isValidTown(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidCategory(request.resource.data);
+      allow update: if isAuthenticated() && isValidCategory(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /locations/{locationId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidLocation(request.resource.data);
+      allow update: if isAuthenticated() && isValidLocation(request.resource.data);
+      allow delete: if isAuthenticated();
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidEvent(request.resource.data);
+      allow update: if isAuthenticated() && isValidEvent(request.resource.data) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
+      allow delete: if isAuthenticated();
+    }
+
+    // Administrative user accounts:
+    // Read and write restricted to authenticated users.
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) &&
+        request.resource.data.uid == request.auth.uid;
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
+        (!('uid' in resource.data) || request.resource.data.uid == resource.data.uid) &&
+        (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt);
+      allow delete: if isAuthenticated();
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
